@@ -9,11 +9,11 @@
 
         <relativePath/> <!-- lookup parent from repository -->
     </parent>
-    <groupId>com.andy</groupId>
-    <artifactId>mall</artifactId>
+    <groupId>com.ovelin</groupId>
+    <artifactId>ovelin-mall</artifactId>
     <version>0.0.1-SNAPSHOT</version>
-    <name>mall</name>
-    <description>mall</description>
+    <name>ovelin-mall</name>
+    <description>ovelin-mall</description>
     <packaging>pom</packaging>
     <url/>
     <licenses>
