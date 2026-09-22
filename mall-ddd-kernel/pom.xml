@@ -9,10 +9,10 @@
         <relativePath/> <!-- lookup parent from repository -->
     </parent>
     <groupId>com.ovelin</groupId>
-    <artifactId>mall-cart-api</artifactId>
+    <artifactId>mall-ddd-kernel</artifactId>
     <version>0.0.1-SNAPSHOT</version>
-    <name>mall-cart-api</name>
-    <description>mall-cart-api</description>
+    <name>mall-ddd-kernel</name>
+    <description>通用 DDD 战术模式基础接口（Entity/AggregateRoot/Identifier 等），不依赖任何具体基础设施</description>
     <url/>
     <licenses>
         <license/>
@@ -31,13 +31,13 @@
     </properties>
     <dependencies>
         <dependency>
-            <groupId>org.springframework.boot</groupId>
-            <artifactId>spring-boot-starter</artifactId>
+            <groupId>org.junit.jupiter</groupId>
+            <artifactId>junit-jupiter</artifactId>
+            <scope>test</scope>
         </dependency>
-
         <dependency>
-            <groupId>org.springframework.boot</groupId>
-            <artifactId>spring-boot-starter-test</artifactId>
+            <groupId>org.assertj</groupId>
+            <artifactId>assertj-core</artifactId>
             <scope>test</scope>
         </dependency>
     </dependencies>
@@ -45,8 +45,8 @@
     <build>
         <plugins>
             <plugin>
-                <groupId>org.springframework.boot</groupId>
-                <artifactId>spring-boot-maven-plugin</artifactId>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-surefire-plugin</artifactId>
             </plugin>
         </plugins>
     </build>

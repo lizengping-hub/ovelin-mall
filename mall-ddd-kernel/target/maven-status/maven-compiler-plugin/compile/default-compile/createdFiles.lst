@@ -1,0 +1,3 @@
+com/ovelin/mall/ddd/kernel/AggregateRoot.class
+com/ovelin/mall/ddd/kernel/Identifier.class
+com/ovelin/mall/ddd/kernel/Entity.class

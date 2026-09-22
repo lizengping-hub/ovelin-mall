@@ -1,4 +1,4 @@
-package com.ovlin.mall.cart.api;
+package com.ovelin.mall.cart.api;
 
 import org.junit.jupiter.api.Test;
 import org.springframework.boot.test.context.SpringBootTest;
