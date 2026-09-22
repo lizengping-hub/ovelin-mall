@@ -9,7 +9,7 @@
         <relativePath/> <!-- lookup parent from repository -->
     </parent>
     <groupId>com.ovelin</groupId>
-    <artifactId>mall-inventoty</artifactId>
+    <artifactId>mall-inventory</artifactId>
     <version>0.0.1-SNAPSHOT</version>
     <name>mall-inventoty</name>
     <description>mall-inventoty</description>
