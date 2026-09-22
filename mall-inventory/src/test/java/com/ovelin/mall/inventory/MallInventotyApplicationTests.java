@@ -1,4 +1,4 @@
-package com.ovelin.mall.inventoty;
+package com.ovelin.mall.inventory;
 
 import org.junit.jupiter.api.Test;
 import org.springframework.boot.test.context.SpringBootTest;
