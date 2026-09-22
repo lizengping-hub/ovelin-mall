@@ -8,7 +8,6 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.datasource.DataSourceTransactionManager;
 import org.springframework.transaction.support.TransactionTemplate;
 
-import javax.sql.DataSource;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
@@ -23,16 +22,16 @@ public class DatabaseClientManager implements AutoCloseable {
         this.properties = properties;
     }
 
-    public JdbcTemplate getJdbcTemplate(String instanceKey) {
+    JdbcTemplate getJdbcTemplate(String instanceKey) {
         return getClient(instanceKey).jdbcTemplate();
     }
 
-    public DataSource getDataSource(String instanceKey) {
-        return getClient(instanceKey).dataSource();
+    TransactionTemplate getTransactionTemplate(String instanceKey) {
+        return getClient(instanceKey).transactionTemplate();
     }
 
-    public TransactionTemplate getTransactionTemplate(String instanceKey) {
-        return getClient(instanceKey).transactionTemplate();
+    public MyBatisClient getMyBatisClient(String instanceKey) {
+        return getClient(instanceKey).myBatisClient();
     }
 
     private DatabaseClient getClient(String instanceKey) {
@@ -62,12 +61,14 @@ public class DatabaseClientManager implements AutoCloseable {
         DataSourceTransactionManager transactionManager =
                 new DataSourceTransactionManager(dataSource);
         TransactionTemplate transactionTemplate = new TransactionTemplate(transactionManager);
-
+        MyBatisClient myBatisClient = new MyBatisClient(
+                dataSource,
+                "com.ovelin.mall");
 
         return new DatabaseClient(
                 dataSource,
                 jdbcTemplate,
-                 transactionTemplate);
+                 transactionTemplate,myBatisClient);
     }
 
     @Override
@@ -83,7 +84,8 @@ public class DatabaseClientManager implements AutoCloseable {
     private record DatabaseClient(
             HikariDataSource dataSource,
             JdbcTemplate jdbcTemplate,
-            TransactionTemplate transactionTemplate) {
+            TransactionTemplate transactionTemplate,
+            MyBatisClient myBatisClient) {
     }
 
 }

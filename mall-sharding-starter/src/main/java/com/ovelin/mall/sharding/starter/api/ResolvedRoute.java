@@ -4,7 +4,11 @@ public record ResolvedRoute(
         int shardId,
         String instanceKey,
         String databaseName) {
+
     public String resolveTableName(String tableName) {
+        if (shardId < 0) {
+            return String.format("%s.%s", databaseName, tableName);
+        }
         return String.format("%s.%s_%s", databaseName, tableName, suffix(shardId));
     }
     private static String suffix(int shardId) {

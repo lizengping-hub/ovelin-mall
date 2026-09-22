@@ -19,6 +19,15 @@ public class ShardRouter {
         this.properties = properties;
     }
 
+    public ResolvedRoute route(ShardGroupKey groupKey) {
+        ShardingProperties.ShardGroup shardGroup = properties.getShardGroup(groupKey); // Ensure the group exists
+        if (shardGroup == null) {
+            throw new IllegalArgumentException("Unknown shard group: " + groupKey);
+        }
+        // For non-sharded execution, we can default to the first route
+        ShardingProperties.ShardRoute route = shardGroup.routes().getFirst();
+        return resolveRoute(-1, route);
+    }
     public ResolvedRoute route(ShardGroupKey groupKey, ShardedId idLayout) {
         ShardingProperties.ShardGroup shardGroup = properties.getShardGroup(groupKey); // Ensure the group exists
 

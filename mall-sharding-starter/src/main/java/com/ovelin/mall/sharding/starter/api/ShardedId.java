@@ -32,11 +32,7 @@ public final class ShardedId implements Identifier {
     }
     public static ShardedId fromSequence(long sequenceValue) {
         long shardId = shardId();
-        if (sequenceValue < 0 || sequenceValue > MAX_SEQUENCE) {
-            throw new IllegalArgumentException(
-                    "Sequence value exceeds the maximum allowed value."
-            );
-        }
+        validateSequence(sequenceValue);
         long id = (sequenceValue << SHARD_BITS) | shardId;
         return new ShardedId(id);
     }
@@ -44,6 +40,18 @@ public final class ShardedId implements Identifier {
         return ThreadLocalRandom.current().nextLong(SHARD_CAPACITY);
     }
 
+    private static void validateSequence(long sequenceValue) {
+        if (sequenceValue < 0) {
+            throw new IllegalArgumentException(
+                    "Sequence value must be non-negative."
+            );
+        }
+        if (sequenceValue > MAX_SEQUENCE) {
+            throw new IllegalArgumentException(
+                    "Sequence value exceeds the maximum allowed value."
+            );
+        }
+    }
     public long getId() {
         return id;
     }

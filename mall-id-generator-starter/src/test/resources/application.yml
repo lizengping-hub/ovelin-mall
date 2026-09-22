@@ -1,0 +1,54 @@
+spring:
+  application:
+    name: identity-service
+
+ovelin:
+  sharding:
+    instances:
+      mysql-instance-0:
+        host: ${MALL_DB_HOST:localhost}
+        port: ${MALL_DB_PORT:3306}
+        username: ${MALL_DB_USERNAME:id_generator_app}
+        password: ${MALL_DB_PASSWORD:id_generator_app}
+        maximum-pool-size: 10
+    shard-routes:
+      id-generator:
+        name: user
+        shard-count: 1
+        routes:
+          - from: 0
+            to: 0
+            instance: mysql-instance-0
+            database: shared_database
+
+server:
+  port: 8080
+
+logging:
+  file:
+    name: logs/id-generator.log
+  pattern:
+    console: "%d{yyyy-MM-dd HH:mm:ss.SSS} [%X{requestId:-}] %-5level [%thread] %logger{36} - %msg%n"
+    file: "%d{yyyy-MM-dd HH:mm:ss.SSS} [%X{requestId:-}] %-5level [%thread] %logger{36} - %msg%n"
+  level:
+    root: ${LOG_LEVEL_ROOT:INFO}
+    com.identityservice: ${LOG_LEVEL_APP:INFO}
+    com.identityservice.infrastructure.persistence.jdbc: ${LOG_LEVEL_REPOSITORY:DEBUG}
+    com.identityservice.config: ${LOG_LEVEL_DATABASE:DEBUG}
+    org.springframework.web: ${LOG_LEVEL_SPRING_WEB:INFO}
+    com.zaxxer.hikari: ${LOG_LEVEL_HIKARI:INFO}
+  logback:
+    rollingpolicy:
+      max-file-size: 10MB
+      max-history: 30
+      total-size-cap: 500MB
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
+  endpoint:
+    health:
+      probes:
+        enabled: true

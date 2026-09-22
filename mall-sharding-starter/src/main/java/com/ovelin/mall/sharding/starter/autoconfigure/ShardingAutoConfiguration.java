@@ -12,7 +12,19 @@ import org.springframework.context.annotation.Configuration;
 @EnableConfigurationProperties(ShardingProperties.class)
 public class ShardingAutoConfiguration {
     @Bean
-    public ShardedJdbcExecutorImpl shardTransactionExecutor(ShardingProperties properties) {
-        return new ShardedJdbcExecutorImpl(new DatabaseClientManager(properties), new ShardRouter(properties));
+    public ShardedJdbcExecutorImpl shardTransactionExecutor(
+            DatabaseClientManager databaseClientManager,
+            ShardRouter shardRouter) {
+        return new ShardedJdbcExecutorImpl(databaseClientManager, shardRouter);
+    }
+
+    @Bean
+    public ShardRouter shardRouter(ShardingProperties properties) {
+        return new ShardRouter(properties);
+    }
+
+    @Bean
+    public DatabaseClientManager databaseClientManager(ShardingProperties properties) {
+        return new DatabaseClientManager(properties);
     }
 }

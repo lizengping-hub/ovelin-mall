@@ -1,0 +1,18 @@
+name: mall
+
+services:
+  mysql:
+    image: mysql:8.4
+    container_name: mall-shared-mysql-instance-dev-mysql
+    restart: unless-stopped
+    ports:
+      - "${MYSQL_PORT:-3306}:3306"
+    environment:
+      MYSQL_ROOT_PASSWORD: root
+    volumes:
+      - mysql-dev-data:/var/lib/mysql
+      - ./mysql/init:/docker-entrypoint-initdb.d:ro
+
+volumes:
+  mysql-dev-data:
+    name: mall-shared-mysql-dev-data

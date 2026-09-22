@@ -11,6 +11,7 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.transaction.support.TransactionTemplate;
 
 import java.util.function.BiFunction;
+import java.util.function.Function;
 
 public class ShardedJdbcExecutorImpl implements ShardedJdbcExecutor {
     private final ShardRouter shardRouter;
@@ -29,6 +30,38 @@ public class ShardedJdbcExecutorImpl implements ShardedJdbcExecutor {
     }
 
     @Override
+    public <R> R execute(ShardGroupKey groupKey, ShardedId idLayout, BiFunction<JdbcTemplate, ResolvedRoute, R> action) {
+        ResolvedRoute route = resolveRoute(groupKey, idLayout);
+        return execute(route, action);
+    }
+
+    @Override
+    public <R> R executeInTransaction(ShardGroupKey groupKey, ShardedId idLayout, BiFunction<JdbcTemplate, ResolvedRoute, R> action) {
+        ResolvedRoute route = resolveRoute(groupKey, idLayout);
+        return executeInTransaction(route, action);
+    }
+
+
+    @Override
+    public ResolvedRoute resolveRoute(ShardGroupKey groupKey) {
+        return shardRouter.route(groupKey);
+    }
+
+
+    @Override
+    public <R> R execute(ShardGroupKey groupKey, BiFunction<JdbcTemplate, ResolvedRoute, R> action) {
+        ResolvedRoute route = resolveRoute(groupKey);
+        return execute(route, action);
+    }
+
+    @Override
+    public <R> R executeInTransaction(ShardGroupKey groupKey, BiFunction<JdbcTemplate, ResolvedRoute, R> action) {
+        ResolvedRoute route = resolveRoute(groupKey);
+        return executeInTransaction(route, action);
+    }
+
+
+    @Override
     public <R> R execute(ResolvedRoute route, BiFunction<JdbcTemplate, ResolvedRoute, R> action) {
         JdbcTemplate template = databaseClientManager.getJdbcTemplate(route.instanceKey());
         return action.apply(template, route);
@@ -41,16 +74,5 @@ public class ShardedJdbcExecutorImpl implements ShardedJdbcExecutor {
         return transactionTemplate.execute(_ -> action.apply(template, route));
     }
 
-    @Override
-    public <R> R execute(ShardGroupKey groupKey, ShardedId idLayout, BiFunction<JdbcTemplate, ResolvedRoute, R> action) {
-        ResolvedRoute route = shardRouter.route(groupKey, idLayout);
-        return execute(route, action);
-    }
-
-    @Override
-    public <R> R executeInTransaction(ShardGroupKey groupKey, ShardedId idLayout, BiFunction<JdbcTemplate, ResolvedRoute, R> action) {
-        ResolvedRoute route = shardRouter.route(groupKey, idLayout);
-        return executeInTransaction(route, action);
-    }
 
 }
