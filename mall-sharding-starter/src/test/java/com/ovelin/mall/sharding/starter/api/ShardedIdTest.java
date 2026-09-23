@@ -7,10 +7,10 @@ public class ShardedIdTest {
     @Test
     public void testIdLayout() {
         long sequenceValue = 12345L;
-        ShardedId idLayout = ShardedId.fromSequence(sequenceValue);
-        long id = idLayout.getId();
-        assert (idLayout.getShardId()) >= 0;
-        assert (idLayout.getSequence()) == sequenceValue;
-        System.out.println("Generated ID: " + idLayout);
+        ShardedId shardedId = ShardedId.fromSequence(sequenceValue);
+        long id = shardedId.getId();
+        assert (shardedId.getShardId()) >= 0;
+        assert (shardedId.getSequence()) == sequenceValue;
+        System.out.println("Generated ID: " + shardedId);
     }
 }

@@ -62,7 +62,7 @@ public interface ShardedJdbcExecutor {
      */
     <R> R execute(
             ShardGroupKey groupKey,
-            ShardedId idLayout,
+            ShardedId shardedId,
             BiFunction<JdbcTemplate, ResolvedRoute, R> action);
 
     /**
@@ -75,7 +75,7 @@ public interface ShardedJdbcExecutor {
      */
     <R> R executeInTransaction(
             ShardGroupKey groupKey,
-            ShardedId idLayout,
+            ShardedId shardedId,
             BiFunction<JdbcTemplate, ResolvedRoute, R> action);
 
 

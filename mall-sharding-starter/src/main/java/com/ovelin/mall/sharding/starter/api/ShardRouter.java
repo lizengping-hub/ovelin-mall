@@ -8,11 +8,11 @@ public interface ShardRouter {
      * 适用于业务只需要获取路由信息的场景，例如构造缓存 Key、日志埋点，
      * 或判断目标数据源等。</p>
      */
-    public ResolvedRoute route(ShardGroupKey groupKey);
+    ResolvedRoute route(ShardGroupKey groupKey);
 
     /**
      * 根据分片组和 ID 布局计算目标分片路由，不执行数据库操作。
      */
-    public ResolvedRoute route(ShardGroupKey groupKey, ShardedId idLayout);
+    ResolvedRoute route(ShardGroupKey groupKey, ShardedId shardedId);
 
 }

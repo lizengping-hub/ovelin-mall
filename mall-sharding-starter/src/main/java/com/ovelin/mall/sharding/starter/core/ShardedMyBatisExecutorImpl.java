@@ -26,14 +26,14 @@ public class ShardedMyBatisExecutorImpl implements ShardedMyBatisExecutor {
         return executeInTransaction(route, action);
     }
     @Override
-    public <R> R execute(ShardGroupKey groupKey, ShardedId idLayout, BiFunction<MyBatisClient, ResolvedRoute, R> action) {
-        ResolvedRoute route = shardRouter.route(groupKey, idLayout);
+    public <R> R execute(ShardGroupKey groupKey, ShardedId shardedId, BiFunction<MyBatisClient, ResolvedRoute, R> action) {
+        ResolvedRoute route = shardRouter.route(groupKey, shardedId);
         return execute(route, action);
     }
 
     @Override
-    public <R> R executeInTransaction(ShardGroupKey groupKey, ShardedId idLayout, BiFunction<MyBatisClient, ResolvedRoute, R> action) {
-        ResolvedRoute route = shardRouter.route(groupKey, idLayout);
+    public <R> R executeInTransaction(ShardGroupKey groupKey, ShardedId shardedId, BiFunction<MyBatisClient, ResolvedRoute, R> action) {
+        ResolvedRoute route = shardRouter.route(groupKey, shardedId);
         return executeInTransaction(route, action);
     }
 

@@ -28,10 +28,10 @@ public class ShardRouterImpl implements ShardRouter {
     }
 
     @Override
-    public ResolvedRoute route(ShardGroupKey groupKey, ShardedId idLayout) {
+    public ResolvedRoute route(ShardGroupKey groupKey, ShardedId shardedId) {
         ShardingProperties.ShardGroup shardGroup = properties.getShardGroup(groupKey); // Ensure the group exists
 
-        long logicalShardId = idLayout.getShardId();
+        long logicalShardId = shardedId.getShardId();
         if (logicalShardId < 0 || logicalShardId > ShardedId.MAX_SHARD_ID) {
             throw new IllegalArgumentException("Shard ID out of range: " + logicalShardId);
         }

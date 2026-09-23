@@ -61,7 +61,7 @@ public interface ShardedMyBatisExecutor {
      */
     <R> R execute(
             ShardGroupKey groupKey,
-            ShardedId idLayout,
+            ShardedId shardedId,
             BiFunction<MyBatisClient, ResolvedRoute, R> action);
 
     /**
@@ -74,6 +74,6 @@ public interface ShardedMyBatisExecutor {
      */
     <R> R executeInTransaction(
             ShardGroupKey groupKey,
-            ShardedId idLayout,
+            ShardedId shardedId,
             BiFunction<MyBatisClient, ResolvedRoute, R> action);
 }
