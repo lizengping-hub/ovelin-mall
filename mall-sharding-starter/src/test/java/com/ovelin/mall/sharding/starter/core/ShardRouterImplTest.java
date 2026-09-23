@@ -12,7 +12,7 @@ import java.util.Map;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
-class ShardRouterTest {
+class ShardRouterImplTest {
 
     private static final ShardGroupKey USER_GROUP = new ShardGroupKey("user");
 
@@ -24,7 +24,7 @@ class ShardRouterTest {
     @Test
     void routesLogicalShardIdToCorrectPhysicalDatabase() {
         // shardCount=2，SHARD_CAPACITY/2 个逻辑 shardId 对应一个物理分片
-        ShardRouter router = routerWith(2,
+        ShardRouterImpl router = routerWith(2,
                 new ShardingProperties.ShardRoute(0, 0, "mysql-0", "user_database_0"),
                 new ShardingProperties.ShardRoute(1, 1, "mysql-1", "user_database_1"));
 
@@ -41,7 +41,7 @@ class ShardRouterTest {
 
     @Test
     void sameLogicalShardIdAlwaysResolvesToSamePhysicalRoute() {
-        ShardRouter router = routerWith(256, fullRangeRoute(256, "mysql-0", "user_database"));
+        ShardRouterImpl router = routerWith(256, fullRangeRoute(256, "mysql-0", "user_database"));
         long shardId = 12345L;
 
         ResolvedRoute first = router.route(USER_GROUP, ShardedId.from(shardId, 1L));
@@ -53,7 +53,7 @@ class ShardRouterTest {
 
     @Test
     void routeThrowsWhenGroupKeyIsUnknown() {
-        ShardRouter router = routerWith(256, fullRangeRoute(256, "mysql-0", "user_database"));
+        ShardRouterImpl router = routerWith(256, fullRangeRoute(256, "mysql-0", "user_database"));
 
         assertThatThrownBy(() -> router.route(new ShardGroupKey("does-not-exist"), ShardedId.from(0L, 0L)))
                 .isInstanceOf(NullPointerException.class);
@@ -65,18 +65,18 @@ class ShardRouterTest {
                 Map.of("mysql-0", INSTANCE_0),
                 Map.of(USER_GROUP, new ShardingProperties.ShardGroup(
                         "user", 1, List.of(new ShardingProperties.ShardRoute(0, 0, "missing-instance", "user_database")))));
-        ShardRouter router = new ShardRouter(properties);
+        ShardRouterImpl router = new ShardRouterImpl(properties);
 
         assertThatThrownBy(() -> router.route(USER_GROUP, ShardedId.from(0L, 0L)))
                 .isInstanceOf(IllegalStateException.class)
                 .hasMessageContaining("Unknown database instance");
     }
 
-    private ShardRouter routerWith(int shardCount, ShardingProperties.ShardRoute... routes) {
+    private ShardRouterImpl routerWith(int shardCount, ShardingProperties.ShardRoute... routes) {
         ShardingProperties properties = new ShardingProperties(
                 Map.of("mysql-0", INSTANCE_0, "mysql-1", INSTANCE_1),
                 Map.of(USER_GROUP, new ShardingProperties.ShardGroup("user", shardCount, List.of(routes))));
-        return new ShardRouter(properties);
+        return new ShardRouterImpl(properties);
     }
 
     private ShardingProperties.ShardRoute fullRangeRoute(int shardCount, String instance, String database) {

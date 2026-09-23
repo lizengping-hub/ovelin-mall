@@ -3,6 +3,6 @@ package com.ovelin.mall.id.generator.starter;
 import com.ovelin.mall.sharding.starter.api.ShardGroupKey;
 
 public class IdGeneratorConstant {
-    public final static ShardGroupKey SHARD_GROUP_KEY = new ShardGroupKey("id-generator");
+    public final static ShardGroupKey SHARED_GROUP_KEY = new ShardGroupKey("id-generator");
     public final static String ID_SEQUENCE_TABLE_NAME = "id_sequence";
 }

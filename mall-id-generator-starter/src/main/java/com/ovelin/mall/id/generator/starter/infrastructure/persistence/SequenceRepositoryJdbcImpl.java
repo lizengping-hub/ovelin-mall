@@ -7,16 +7,16 @@ import com.ovelin.mall.id.generator.starter.domain.module.ov.SequenceName;
 import com.ovelin.mall.id.generator.starter.domain.port.SequenceRepository;
 import com.ovelin.mall.sharding.starter.api.ShardedJdbcExecutor;
 
-public class SequenceRepositoryImpl implements SequenceRepository {
+public class SequenceRepositoryJdbcImpl implements SequenceRepository {
     private final ShardedJdbcExecutor executor;
 
-    public SequenceRepositoryImpl(ShardedJdbcExecutor executor) {
-        this.executor = executor;
+    public SequenceRepositoryJdbcImpl(ShardedJdbcExecutor shardedJdbcExecutor) {
+        this.executor = shardedJdbcExecutor;
     }
 
     @Override
     public Segment nextSegment(SequenceName name) {
-        return executor.executeInTransaction(IdGeneratorConstant.SHARD_GROUP_KEY, (jdbcTemplate, route) -> {
+        return executor.executeInTransaction(IdGeneratorConstant.SHARED_GROUP_KEY, (jdbcTemplate, route) -> {
             String tableName = route.resolveTableName(IdGeneratorConstant.ID_SEQUENCE_TABLE_NAME);
 
             Segment segment = jdbcTemplate.query("""
@@ -45,22 +45,8 @@ public class SequenceRepositoryImpl implements SequenceRepository {
 
     @Override
     public void initIfAbsent(SequenceName name, AllocationSize size) {
-        executor.executeInTransaction(IdGeneratorConstant.SHARD_GROUP_KEY, (jdbcTemplate, route) -> {
+        executor.executeInTransaction(IdGeneratorConstant.SHARED_GROUP_KEY, (jdbcTemplate, route) -> {
             String tableName = route.resolveTableName(IdGeneratorConstant.ID_SEQUENCE_TABLE_NAME);
-//            jdbcTemplate.execute("CREATE TABLE IF NOT EXISTS " + tableName + """
-//                    (
-//                        sequence_name VARCHAR(128) NOT NULL,
-//                        next_value BIGINT UNSIGNED NOT NULL DEFAULT 0,
-//                        allocation_size INT UNSIGNED NOT NULL DEFAULT 1000,
-//                        version BIGINT UNSIGNED NOT NULL DEFAULT 0,
-//                        updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
-//                            ON UPDATE CURRENT_TIMESTAMP,
-//                        PRIMARY KEY (sequence_name)
-//                    ) ENGINE=InnoDB
-//                    DEFAULT CHARSET=utf8mb4
-//                    COLLATE=utf8mb4_0900_ai_ci
-//                    """);
-
             jdbcTemplate.update("""
                     INSERT INTO %s (sequence_name, next_value, allocation_size)
                     VALUES (?, 0, ?)

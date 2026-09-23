@@ -5,31 +5,22 @@ import com.ovelin.mall.id.generator.starter.domain.module.ov.AllocationSize;
 import com.ovelin.mall.id.generator.starter.domain.module.ov.Segment;
 import com.ovelin.mall.id.generator.starter.domain.module.ov.SequenceName;
 import com.ovelin.mall.id.generator.starter.domain.port.SequenceRepository;
-import com.ovelin.mall.sharding.starter.api.ResolvedRoute;
-import com.ovelin.mall.sharding.starter.api.ShardedJdbcExecutor;
-import com.ovelin.mall.sharding.starter.core.DatabaseClientManager;
+import com.ovelin.mall.sharding.starter.api.ShardedMyBatisExecutor;
 
 public class SequenceRepositoryMyHabitsImpl implements SequenceRepository {
 
-    private final ShardedJdbcExecutor executor;
-    private final DatabaseClientManager databaseClientManager;
-
-    public SequenceRepositoryMyHabitsImpl(
-            ShardedJdbcExecutor executor,
-            DatabaseClientManager databaseClientManager) {
+    private final ShardedMyBatisExecutor executor;
+    public SequenceRepositoryMyHabitsImpl(ShardedMyBatisExecutor executor) {
         this.executor = executor;
-        this.databaseClientManager = databaseClientManager;
     }
 
     @Override
     public Segment nextSegment(SequenceName name) {
-        ResolvedRoute route = executor.resolveRoute(IdGeneratorConstant.SHARD_GROUP_KEY);
-        IdSequenceMapper mapper = databaseClientManager
-                .getMyBatisClient(route.instanceKey())
-                .mapper(IdSequenceMapper.class);
-        String tableName = route.resolveTableName(IdGeneratorConstant.ID_SEQUENCE_TABLE_NAME);
 
-        return executor.executeInTransaction(route, (jdbcTemplate, ignored) -> {
+        return executor.executeInTransaction(IdGeneratorConstant.SHARED_GROUP_KEY, (myBatisClient, route) -> {
+            String tableName = route.resolveTableName(IdGeneratorConstant.ID_SEQUENCE_TABLE_NAME);
+            IdSequenceMapper mapper = myBatisClient.mapper(IdSequenceMapper.class);
+
             IdSequence sequence = mapper.selectByName(tableName, name.value());
             if (sequence == null) {
                 throw new IllegalStateException("Sequence not found: " + name.value());
@@ -49,13 +40,12 @@ public class SequenceRepositoryMyHabitsImpl implements SequenceRepository {
 
     @Override
     public void initIfAbsent(SequenceName name, AllocationSize size) {
-        ResolvedRoute route = executor.resolveRoute(IdGeneratorConstant.SHARD_GROUP_KEY);
-        IdSequenceMapper mapper = databaseClientManager
-                .getMyBatisClient(route.instanceKey())
-                .mapper(IdSequenceMapper.class);
-        String tableName = route.resolveTableName(IdGeneratorConstant.ID_SEQUENCE_TABLE_NAME);
 
-        executor.executeInTransaction(route, (jdbcTemplate, ignored) -> {
+        executor.execute(IdGeneratorConstant.SHARED_GROUP_KEY, (myBatisClient, resolvedRoute) -> {
+            String tableName = resolvedRoute.resolveTableName(IdGeneratorConstant.ID_SEQUENCE_TABLE_NAME);
+
+            IdSequenceMapper mapper = myBatisClient
+                    .mapper(IdSequenceMapper.class);
             mapper.insertIfAbsent(tableName, name.value(), size.value());
             return null;
         });

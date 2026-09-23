@@ -5,7 +5,7 @@ import com.ovelin.mall.id.generator.starter.domain.module.ov.Segment;
 import com.ovelin.mall.id.generator.starter.domain.module.ov.SequenceName;
 import com.ovelin.mall.id.generator.starter.domain.port.SequenceRepository;
 import com.ovelin.mall.sharding.starter.api.ShardedJdbcExecutor;
-import com.ovelin.mall.sharding.starter.core.DatabaseClientManager;
+
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -16,8 +16,6 @@ class MallIdGeneratorStarterApplicationTests {
     ShardedJdbcExecutor shardTransactionExecutor;
     @Autowired
     SequenceRepository sequenceRepository;
-    @Autowired
-    DatabaseClientManager databaseClientManager;
     @Test
     void contextLoads() {
         if (shardTransactionExecutor == null) {
@@ -26,10 +24,7 @@ class MallIdGeneratorStarterApplicationTests {
         if (sequenceRepository == null) {
             throw new IllegalStateException("sequenceRepository is null");
         }
-        if (databaseClientManager == null) {
-            throw new IllegalStateException("databaseClientManager is null");
-        }
-        shardTransactionExecutor.execute(IdGeneratorConstant.SHARD_GROUP_KEY, (jdbcTemplate, route) -> {
+        shardTransactionExecutor.execute(IdGeneratorConstant.SHARED_GROUP_KEY, (jdbcTemplate, route) -> {
             jdbcTemplate.execute("SELECT * FROM " + route.resolveTableName(IdGeneratorConstant.ID_SEQUENCE_TABLE_NAME));
             return null;
         });
@@ -41,7 +36,7 @@ class MallIdGeneratorStarterApplicationTests {
         if (shardTransactionExecutor == null) {
             throw new IllegalStateException("shardTransactionExecutor is null");
         }
-        shardTransactionExecutor.execute(IdGeneratorConstant.SHARD_GROUP_KEY, (jdbcTemplate, route) -> {
+        shardTransactionExecutor.execute(IdGeneratorConstant.SHARED_GROUP_KEY, (jdbcTemplate, route) -> {
             jdbcTemplate.execute("SELECT * FROM " + route.resolveTableName(IdGeneratorConstant.ID_SEQUENCE_TABLE_NAME));
             return null;
         });

@@ -4,6 +4,7 @@ import org.apache.ibatis.session.Configuration;
 import org.apache.ibatis.session.SqlSessionFactory;
 import org.mybatis.spring.SqlSessionFactoryBean;
 import org.mybatis.spring.SqlSessionTemplate;
+import org.springframework.beans.factory.annotation.AnnotatedBeanDefinition;
 import org.springframework.beans.factory.config.BeanDefinition;
 import org.springframework.context.annotation.ClassPathScanningCandidateComponentProvider;
 import org.springframework.core.io.support.PathMatchingResourcePatternResolver;
@@ -43,8 +44,17 @@ public class MyBatisClient {
         this.sqlSessionTemplate = new SqlSessionTemplate(sqlSessionFactory);
     }
     private void registerMappers(Configuration cfg, String basePackage) {
+        // 默认的 ClassPathScanningCandidateComponentProvider 只接受具体类（isConcrete），
+        // 会把 @Mapper 接口过滤掉，所以这里必须覆写 isCandidateComponent 以放行接口，
+        // 否则扫描结果永远为空，Mapper 不会被注册到 MyBatis 的 Configuration 中。
         ClassPathScanningCandidateComponentProvider scanner =
-                new ClassPathScanningCandidateComponentProvider(false);
+                new ClassPathScanningCandidateComponentProvider(false) {
+                    @Override
+                    protected boolean isCandidateComponent(AnnotatedBeanDefinition beanDefinition) {
+                        return beanDefinition.getMetadata().isInterface()
+                                && beanDefinition.getMetadata().isIndependent();
+                    }
+                };
         scanner.addIncludeFilter(new AnnotationTypeFilter(
                 org.apache.ibatis.annotations.Mapper.class));
 

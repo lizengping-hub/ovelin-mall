@@ -1,11 +1,10 @@
 package com.ovelin.mall.sharding.starter.api;
 
 import com.ovelin.mall.sharding.starter.core.MyBatisClient;
-import org.springframework.jdbc.core.JdbcTemplate;
 
 import java.util.function.BiFunction;
 
-public interface ShardedJdbcExecutor {
+public interface ShardedMyBatisExecutor {
 
     /**
      * 不进行分片，使用指定分片组的默认数据源执行数据库操作。
@@ -17,7 +16,7 @@ public interface ShardedJdbcExecutor {
      */
     <R> R execute(
             ShardGroupKey groupKey,
-            BiFunction<JdbcTemplate, ResolvedRoute, R> action);
+            BiFunction<MyBatisClient, ResolvedRoute, R> action);
 
 
     /**
@@ -29,7 +28,7 @@ public interface ShardedJdbcExecutor {
      */
     <R> R executeInTransaction(
             ShardGroupKey groupKey,
-            BiFunction<JdbcTemplate, ResolvedRoute, R> action);
+            BiFunction<MyBatisClient, ResolvedRoute, R> action);
 
     /**
      * 使用已解析的路由执行数据库操作。
@@ -39,7 +38,7 @@ public interface ShardedJdbcExecutor {
      */
     <R> R execute(
             ResolvedRoute route,
-            BiFunction<JdbcTemplate, ResolvedRoute, R> action);
+            BiFunction<MyBatisClient, ResolvedRoute, R> action);
 
     /**
      * 使用已解析的路由执行数据库操作，并在目标数据库内开启单库事务。
@@ -48,7 +47,7 @@ public interface ShardedJdbcExecutor {
      */
     <R> R executeInTransaction(
             ResolvedRoute route,
-            BiFunction<JdbcTemplate, ResolvedRoute, R> action);
+            BiFunction<MyBatisClient, ResolvedRoute, R> action);
 
 
     /**
@@ -63,7 +62,7 @@ public interface ShardedJdbcExecutor {
     <R> R execute(
             ShardGroupKey groupKey,
             ShardedId idLayout,
-            BiFunction<JdbcTemplate, ResolvedRoute, R> action);
+            BiFunction<MyBatisClient, ResolvedRoute, R> action);
 
     /**
      * 根据分片组和 ID 布局计算目标分片，
@@ -76,7 +75,5 @@ public interface ShardedJdbcExecutor {
     <R> R executeInTransaction(
             ShardGroupKey groupKey,
             ShardedId idLayout,
-            BiFunction<JdbcTemplate, ResolvedRoute, R> action);
-
-
+            BiFunction<MyBatisClient, ResolvedRoute, R> action);
 }

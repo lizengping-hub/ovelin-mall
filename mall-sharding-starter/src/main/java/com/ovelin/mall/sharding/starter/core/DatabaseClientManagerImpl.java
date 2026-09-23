@@ -1,5 +1,6 @@
 package com.ovelin.mall.sharding.starter.core;
 
+import com.ovelin.mall.sharding.starter.api.DatabaseClientManager;
 import com.ovelin.mall.sharding.starter.api.ShardingProperties;
 import com.zaxxer.hikari.HikariDataSource;
 import org.slf4j.Logger;
@@ -11,25 +12,28 @@ import org.springframework.transaction.support.TransactionTemplate;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
-public class DatabaseClientManager implements AutoCloseable {
+public class DatabaseClientManagerImpl implements DatabaseClientManager {
 
-    private static final Logger log = LoggerFactory.getLogger(DatabaseClientManager.class);
+    private static final Logger log = LoggerFactory.getLogger(DatabaseClientManagerImpl.class);
 
     private final ShardingProperties properties;
     private final Map<String, DatabaseClient> clients = new ConcurrentHashMap<>();
 
-    public DatabaseClientManager(ShardingProperties properties) {
+    public DatabaseClientManagerImpl(ShardingProperties properties) {
         this.properties = properties;
     }
 
-    JdbcTemplate getJdbcTemplate(String instanceKey) {
+    @Override
+    public JdbcTemplate getJdbcTemplate(String instanceKey) {
         return getClient(instanceKey).jdbcTemplate();
     }
 
-    TransactionTemplate getTransactionTemplate(String instanceKey) {
+    @Override
+    public TransactionTemplate getTransactionTemplate(String instanceKey) {
         return getClient(instanceKey).transactionTemplate();
     }
 
+    @Override
     public MyBatisClient getMyBatisClient(String instanceKey) {
         return getClient(instanceKey).myBatisClient();
     }
@@ -54,7 +58,7 @@ public class DatabaseClientManager implements AutoCloseable {
         dataSource.setUsername(instance.username());
         dataSource.setPassword(instance.password());
         dataSource.setMaximumPoolSize(instance.maximumPoolSize());
-        dataSource.setPoolName("identity-" + instanceKey);
+        dataSource.setPoolName("ovelin-mall-" + instanceKey);
         log.info("Created database connection pool for instance {}", instanceKey);
         JdbcTemplate jdbcTemplate = new JdbcTemplate(dataSource);
 

@@ -1,24 +1,22 @@
 package com.ovelin.mall.sharding.starter.core;
 
-import com.ovelin.mall.sharding.starter.api.ShardedId;
-import com.ovelin.mall.sharding.starter.api.ResolvedRoute;
-import com.ovelin.mall.sharding.starter.api.ShardGroupKey;
-import com.ovelin.mall.sharding.starter.api.ShardingProperties;
+import com.ovelin.mall.sharding.starter.api.*;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.util.List;
 
-public class ShardRouter {
+public class ShardRouterImpl implements ShardRouter {
 
-    private static final Logger log = LoggerFactory.getLogger(ShardRouter.class);
+    private static final Logger log = LoggerFactory.getLogger(ShardRouterImpl.class);
 
     private final ShardingProperties properties;
 
-    public ShardRouter(ShardingProperties properties) {
+    public ShardRouterImpl(ShardingProperties properties) {
         this.properties = properties;
     }
 
+    @Override
     public ResolvedRoute route(ShardGroupKey groupKey) {
         ShardingProperties.ShardGroup shardGroup = properties.getShardGroup(groupKey); // Ensure the group exists
         if (shardGroup == null) {
@@ -28,6 +26,8 @@ public class ShardRouter {
         ShardingProperties.ShardRoute route = shardGroup.routes().getFirst();
         return resolveRoute(-1, route);
     }
+
+    @Override
     public ResolvedRoute route(ShardGroupKey groupKey, ShardedId idLayout) {
         ShardingProperties.ShardGroup shardGroup = properties.getShardGroup(groupKey); // Ensure the group exists
 
