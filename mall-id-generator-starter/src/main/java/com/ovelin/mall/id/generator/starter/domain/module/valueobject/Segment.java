@@ -1,6 +1,4 @@
-package com.ovelin.mall.id.generator.starter.domain.module.ov;
-
-import com.ovelin.mall.sharding.starter.api.ShardedId;
+package com.ovelin.mall.id.generator.starter.domain.module.valueobject;
 
 import java.util.concurrent.atomic.AtomicLong;
 

@@ -1,6 +1,6 @@
 package com.ovelin.mall.id.generator.starter.application;
 
-import com.ovelin.mall.id.generator.starter.domain.module.ov.SequenceName;
+import com.ovelin.mall.id.generator.starter.domain.module.valueobject.SequenceName;
 
 public class IdGeneratorImpl implements IdGenerator{
 

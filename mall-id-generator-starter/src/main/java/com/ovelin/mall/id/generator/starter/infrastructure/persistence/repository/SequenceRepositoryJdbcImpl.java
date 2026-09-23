@@ -1,10 +1,10 @@
-package com.ovelin.mall.id.generator.starter.infrastructure.persistence;
+package com.ovelin.mall.id.generator.starter.infrastructure.persistence.repository;
 
-import com.ovelin.mall.id.generator.starter.IdGeneratorConstant;
-import com.ovelin.mall.id.generator.starter.domain.module.ov.AllocationSize;
-import com.ovelin.mall.id.generator.starter.domain.module.ov.Segment;
-import com.ovelin.mall.id.generator.starter.domain.module.ov.SequenceName;
+import com.ovelin.mall.id.generator.starter.domain.module.valueobject.AllocationSize;
+import com.ovelin.mall.id.generator.starter.domain.module.valueobject.Segment;
+import com.ovelin.mall.id.generator.starter.domain.module.valueobject.SequenceName;
 import com.ovelin.mall.id.generator.starter.domain.port.SequenceRepository;
+import com.ovelin.mall.id.generator.starter.infrastructure.persistence.IdGeneratorConstant;
 import com.ovelin.mall.sharding.starter.api.ShardedJdbcExecutor;
 
 public class SequenceRepositoryJdbcImpl implements SequenceRepository {

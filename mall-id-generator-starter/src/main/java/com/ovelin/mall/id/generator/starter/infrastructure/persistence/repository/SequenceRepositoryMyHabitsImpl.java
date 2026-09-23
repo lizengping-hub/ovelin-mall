@@ -1,10 +1,13 @@
-package com.ovelin.mall.id.generator.starter.infrastructure.persistence;
+package com.ovelin.mall.id.generator.starter.infrastructure.persistence.repository;
 
-import com.ovelin.mall.id.generator.starter.IdGeneratorConstant;
-import com.ovelin.mall.id.generator.starter.domain.module.ov.AllocationSize;
-import com.ovelin.mall.id.generator.starter.domain.module.ov.Segment;
-import com.ovelin.mall.id.generator.starter.domain.module.ov.SequenceName;
+import com.ovelin.mall.id.generator.starter.domain.module.valueobject.AllocationSize;
+import com.ovelin.mall.id.generator.starter.domain.module.valueobject.Segment;
+import com.ovelin.mall.id.generator.starter.domain.module.valueobject.SequenceName;
 import com.ovelin.mall.id.generator.starter.domain.port.SequenceRepository;
+
+import com.ovelin.mall.id.generator.starter.infrastructure.persistence.IdGeneratorConstant;
+import com.ovelin.mall.id.generator.starter.infrastructure.persistence.mapper.IdSequenceMapper;
+import com.ovelin.mall.id.generator.starter.infrastructure.persistence.po.IdSequencePO;
 import com.ovelin.mall.sharding.starter.api.ShardedMyBatisExecutor;
 
 public class SequenceRepositoryMyHabitsImpl implements SequenceRepository {
@@ -21,7 +24,7 @@ public class SequenceRepositoryMyHabitsImpl implements SequenceRepository {
             String tableName = route.resolveTableName(IdGeneratorConstant.ID_SEQUENCE_TABLE_NAME);
             IdSequenceMapper mapper = myBatisClient.mapper(IdSequenceMapper.class);
 
-            IdSequence sequence = mapper.selectByName(tableName, name.value());
+            IdSequencePO sequence = mapper.selectByName(tableName, name.value());
             if (sequence == null) {
                 throw new IllegalStateException("Sequence not found: " + name.value());
             }

@@ -1,4 +1,4 @@
-package com.ovelin.mall.id.generator.starter;
+package com.ovelin.mall.id.generator.starter.infrastructure.persistence;
 
 import com.ovelin.mall.sharding.starter.api.ShardGroupKey;
 

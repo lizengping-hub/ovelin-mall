@@ -1,6 +1,6 @@
-package com.ovelin.mall.id.generator.starter.infrastructure.persistence;
+package com.ovelin.mall.id.generator.starter.infrastructure.persistence.po;
 
-public record IdSequence(
+public record IdSequencePO(
         String sequenceName,
         long nextValue,
         int allocationSize,

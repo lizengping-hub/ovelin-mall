@@ -1,5 +1,6 @@
-package com.ovelin.mall.id.generator.starter.infrastructure.persistence;
+package com.ovelin.mall.id.generator.starter.infrastructure.persistence.mapper;
 
+import com.ovelin.mall.id.generator.starter.infrastructure.persistence.po.IdSequencePO;
 import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Insert;
 import org.apache.ibatis.annotations.Param;
@@ -25,7 +26,7 @@ public interface IdSequenceMapper {
             WHERE sequence_name = #{sequenceName}
             FOR UPDATE
             """)
-    IdSequence selectByName(
+    IdSequencePO selectByName(
             @Param("tableName") String tableName,
             @Param("sequenceName") String sequenceName);
 
