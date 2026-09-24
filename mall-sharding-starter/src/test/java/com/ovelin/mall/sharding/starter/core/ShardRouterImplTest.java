@@ -1,9 +1,9 @@
 package com.ovelin.mall.sharding.starter.core;
 
 import com.ovelin.mall.sharding.starter.api.ShardedId;
-import com.ovelin.mall.sharding.starter.api.ResolvedRoute;
-import com.ovelin.mall.sharding.starter.api.ShardGroupKey;
-import com.ovelin.mall.sharding.starter.api.ShardingProperties;
+import com.ovelin.mall.sharding.starter.api.router.ResolvedRoute;
+import com.ovelin.mall.sharding.starter.api.router.ShardGroupKey;
+import com.ovelin.mall.sharding.starter.api.router.ShardingProperties;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;

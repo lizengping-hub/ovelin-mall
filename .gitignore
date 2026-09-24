@@ -1,5 +1,5 @@
 
 .idea
 .DS_Store
-logs
-target
+logs/
+target/

@@ -1,7 +1,7 @@
-package com.ovelin.mall.sharding.starter.core;
+package com.ovelin.mall.sharding.starter.core.client;
 
-import com.ovelin.mall.sharding.starter.api.DatabaseClientManager;
-import com.ovelin.mall.sharding.starter.api.ShardingProperties;
+import com.ovelin.mall.sharding.starter.api.client.DatabaseClientManager;
+import com.ovelin.mall.sharding.starter.api.router.ShardingProperties;
 import com.zaxxer.hikari.HikariDataSource;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -38,6 +38,11 @@ public class DatabaseClientManagerImpl implements DatabaseClientManager {
         return getClient(instanceKey).myBatisClient();
     }
 
+    @Override
+    public MyBatisPlusClient getMyBatisPlusClient(String instanceKey) {
+        return getClient(instanceKey).myBatisPlusClient();
+    }
+
     private DatabaseClient getClient(String instanceKey) {
         return clients.computeIfAbsent(instanceKey, this::createClient);
     }
@@ -68,11 +73,14 @@ public class DatabaseClientManagerImpl implements DatabaseClientManager {
         MyBatisClient myBatisClient = new MyBatisClient(
                 dataSource,
                 "com.ovelin.mall");
+        MyBatisPlusClient myBatisPlusClient = new MyBatisPlusClient(
+                dataSource,
+                "com.ovelin.mall");
 
         return new DatabaseClient(
                 dataSource,
                 jdbcTemplate,
-                 transactionTemplate,myBatisClient);
+                 transactionTemplate,myBatisClient,myBatisPlusClient);
     }
 
     @Override
@@ -89,7 +97,8 @@ public class DatabaseClientManagerImpl implements DatabaseClientManager {
             HikariDataSource dataSource,
             JdbcTemplate jdbcTemplate,
             TransactionTemplate transactionTemplate,
-            MyBatisClient myBatisClient) {
+            MyBatisClient myBatisClient,
+            MyBatisPlusClient myBatisPlusClient) {
     }
 
 }

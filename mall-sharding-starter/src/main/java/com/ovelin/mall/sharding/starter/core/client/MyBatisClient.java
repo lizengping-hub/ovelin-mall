@@ -1,4 +1,4 @@
-package com.ovelin.mall.sharding.starter.core;
+package com.ovelin.mall.sharding.starter.core.client;
 
 import org.apache.ibatis.session.Configuration;
 import org.apache.ibatis.session.SqlSessionFactory;
@@ -7,9 +7,7 @@ import org.mybatis.spring.SqlSessionTemplate;
 import org.springframework.beans.factory.annotation.AnnotatedBeanDefinition;
 import org.springframework.beans.factory.config.BeanDefinition;
 import org.springframework.context.annotation.ClassPathScanningCandidateComponentProvider;
-import org.springframework.core.io.support.PathMatchingResourcePatternResolver;
 import org.springframework.core.type.filter.AnnotationTypeFilter;
-import org.springframework.jdbc.core.JdbcTemplate;
 
 import javax.sql.DataSource;
 import java.util.Objects;
@@ -25,8 +23,7 @@ public class MyBatisClient {
         bean.setDataSource(dataSource);
         bean.setTypeAliasesPackage(typeAliasesPackage);
 
-        org.apache.ibatis.session.Configuration cfg =
-                new org.apache.ibatis.session.Configuration();
+        Configuration cfg = new Configuration();
         cfg.setMapUnderscoreToCamelCase(true);
         cfg.setCacheEnabled(false);
         registerMappers(cfg, typeAliasesPackage);

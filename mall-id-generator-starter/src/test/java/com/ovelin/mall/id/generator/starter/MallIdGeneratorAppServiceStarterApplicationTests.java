@@ -5,7 +5,7 @@ import com.ovelin.mall.id.generator.starter.domain.module.Segment;
 import com.ovelin.mall.id.generator.starter.domain.module.valueobject.SequenceName;
 import com.ovelin.mall.id.generator.starter.domain.repository.SequenceRepository;
 import com.ovelin.mall.id.generator.starter.infrastructure.persistence.IdGeneratorConstant;
-import com.ovelin.mall.sharding.starter.api.ShardedJdbcExecutor;
+import com.ovelin.mall.sharding.starter.api.excutor.ShardedJdbcExecutor;
 
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;

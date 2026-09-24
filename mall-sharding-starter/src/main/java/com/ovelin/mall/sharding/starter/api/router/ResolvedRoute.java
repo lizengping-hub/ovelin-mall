@@ -1,5 +1,7 @@
-package com.ovelin.mall.sharding.starter.api;
-
+package com.ovelin.mall.sharding.starter.api.router;
+/**
+shardId < 0 表示没有分片，表名不需要加后缀
+*/
 public record ResolvedRoute(
         int shardId,
         String instanceKey,

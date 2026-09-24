@@ -1,4 +1,6 @@
-package com.ovelin.mall.sharding.starter.api;
+package com.ovelin.mall.sharding.starter.api.excutor;
+
+import com.ovelin.mall.sharding.starter.api.ShardedId;
 
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;

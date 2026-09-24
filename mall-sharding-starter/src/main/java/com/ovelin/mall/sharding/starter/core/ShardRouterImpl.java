@@ -1,6 +1,10 @@
 package com.ovelin.mall.sharding.starter.core;
 
 import com.ovelin.mall.sharding.starter.api.*;
+import com.ovelin.mall.sharding.starter.api.router.ResolvedRoute;
+import com.ovelin.mall.sharding.starter.api.router.ShardGroupKey;
+import com.ovelin.mall.sharding.starter.api.router.ShardRouter;
+import com.ovelin.mall.sharding.starter.api.router.ShardingProperties;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 

@@ -8,7 +8,7 @@ import com.ovelin.mall.id.generator.starter.domain.repository.SequenceRepository
 import com.ovelin.mall.id.generator.starter.infrastructure.persistence.IdGeneratorConstant;
 import com.ovelin.mall.id.generator.starter.infrastructure.persistence.mapper.IdSequenceMapper;
 import com.ovelin.mall.id.generator.starter.infrastructure.persistence.po.IdSequencePO;
-import com.ovelin.mall.sharding.starter.api.ShardedMyBatisExecutor;
+import com.ovelin.mall.sharding.starter.api.excutor.ShardedMyBatisExecutor;
 
 public class IdSequenceRepositoryMyHabitsImpl implements SequenceRepository {
 

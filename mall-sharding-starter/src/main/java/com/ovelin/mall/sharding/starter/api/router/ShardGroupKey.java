@@ -1,4 +1,4 @@
-package com.ovelin.mall.sharding.starter.api;
+package com.ovelin.mall.sharding.starter.api.router;
 
 /**
  * 分片组标识，由使用方在配置文件（ovelin.sharding.shard-routes 下的 key）
