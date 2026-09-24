@@ -1,9 +1,9 @@
 package com.ovelin.mall.id.generator.starter;
 
 import com.ovelin.mall.id.generator.starter.domain.module.valueobject.AllocationSize;
-import com.ovelin.mall.id.generator.starter.domain.module.valueobject.Segment;
+import com.ovelin.mall.id.generator.starter.domain.module.Segment;
 import com.ovelin.mall.id.generator.starter.domain.module.valueobject.SequenceName;
-import com.ovelin.mall.id.generator.starter.domain.port.SequenceRepository;
+import com.ovelin.mall.id.generator.starter.domain.repository.SequenceRepository;
 import com.ovelin.mall.id.generator.starter.infrastructure.persistence.IdGeneratorConstant;
 import com.ovelin.mall.sharding.starter.api.ShardedJdbcExecutor;
 
@@ -12,7 +12,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 
 @SpringBootTest
-class MallIdGeneratorStarterApplicationTests {
+class MallIdGeneratorAppServiceStarterApplicationTests {
     @Autowired
     ShardedJdbcExecutor shardTransactionExecutor;
     @Autowired
@@ -51,8 +51,8 @@ class MallIdGeneratorStarterApplicationTests {
         sequenceRepository.initIfAbsent(new SequenceName("test_sequence"), new AllocationSize(allocationSize));
         Segment lastSegment = null;
         for (int i = 0; i < 10; i++) {
-            Segment segment = sequenceRepository.nextSegment(new SequenceName("test_sequence"));
-            System.out.println("Next segment: " + segment);
+            Segment segment = sequenceRepository.allocateSegment(new SequenceName("test_sequence"));
+//            System.out.println("Next segment: " + segment);
             if (lastSegment != null) {
                 if (segment.minValue() != lastSegment.minValue() + lastSegment.size()) {
                     throw new IllegalStateException("Segments are not contiguous last: " + lastSegment + " and new " + segment);

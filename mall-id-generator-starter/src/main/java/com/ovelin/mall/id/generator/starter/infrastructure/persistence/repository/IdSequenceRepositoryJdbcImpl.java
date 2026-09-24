@@ -1,21 +1,21 @@
 package com.ovelin.mall.id.generator.starter.infrastructure.persistence.repository;
 
 import com.ovelin.mall.id.generator.starter.domain.module.valueobject.AllocationSize;
-import com.ovelin.mall.id.generator.starter.domain.module.valueobject.Segment;
+import com.ovelin.mall.id.generator.starter.domain.module.Segment;
 import com.ovelin.mall.id.generator.starter.domain.module.valueobject.SequenceName;
-import com.ovelin.mall.id.generator.starter.domain.port.SequenceRepository;
+import com.ovelin.mall.id.generator.starter.domain.repository.SequenceRepository;
 import com.ovelin.mall.id.generator.starter.infrastructure.persistence.IdGeneratorConstant;
 import com.ovelin.mall.sharding.starter.api.ShardedJdbcExecutor;
 
-public class SequenceRepositoryJdbcImpl implements SequenceRepository {
+public class IdSequenceRepositoryJdbcImpl implements SequenceRepository {
     private final ShardedJdbcExecutor executor;
 
-    public SequenceRepositoryJdbcImpl(ShardedJdbcExecutor shardedJdbcExecutor) {
+    public IdSequenceRepositoryJdbcImpl(ShardedJdbcExecutor shardedJdbcExecutor) {
         this.executor = shardedJdbcExecutor;
     }
 
     @Override
-    public Segment nextSegment(SequenceName name) {
+    public Segment allocateSegment(SequenceName name) {
         return executor.executeInTransaction(IdGeneratorConstant.SHARED_GROUP_KEY, (jdbcTemplate, route) -> {
             String tableName = route.resolveTableName(IdGeneratorConstant.ID_SEQUENCE_TABLE_NAME);
 

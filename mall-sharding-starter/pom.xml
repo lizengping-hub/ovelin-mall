@@ -76,6 +76,23 @@
             <plugin>
                 <groupId>org.springframework.boot</groupId>
                 <artifactId>spring-boot-maven-plugin</artifactId>
+                <executions>
+                    <!-- 覆盖 spring-boot-starter-parent 默认绑定的 repackage,不让它动主 artifact -->
+                    <execution>
+                        <id>repackage</id>
+                        <phase>none</phase>
+                    </execution>
+
+                    <execution>
+                        <id>repackage-exec</id>
+                        <goals>
+                            <goal>repackage</goal>
+                        </goals>
+                        <configuration>
+                            <classifier>exec</classifier>
+                        </configuration>
+                    </execution>
+                </executions>
             </plugin>
         </plugins>
     </build>

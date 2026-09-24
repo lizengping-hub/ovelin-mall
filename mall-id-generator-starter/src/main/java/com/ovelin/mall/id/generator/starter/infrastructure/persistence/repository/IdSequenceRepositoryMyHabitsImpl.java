@@ -1,24 +1,24 @@
 package com.ovelin.mall.id.generator.starter.infrastructure.persistence.repository;
 
 import com.ovelin.mall.id.generator.starter.domain.module.valueobject.AllocationSize;
-import com.ovelin.mall.id.generator.starter.domain.module.valueobject.Segment;
+import com.ovelin.mall.id.generator.starter.domain.module.Segment;
 import com.ovelin.mall.id.generator.starter.domain.module.valueobject.SequenceName;
-import com.ovelin.mall.id.generator.starter.domain.port.SequenceRepository;
+import com.ovelin.mall.id.generator.starter.domain.repository.SequenceRepository;
 
 import com.ovelin.mall.id.generator.starter.infrastructure.persistence.IdGeneratorConstant;
 import com.ovelin.mall.id.generator.starter.infrastructure.persistence.mapper.IdSequenceMapper;
 import com.ovelin.mall.id.generator.starter.infrastructure.persistence.po.IdSequencePO;
 import com.ovelin.mall.sharding.starter.api.ShardedMyBatisExecutor;
 
-public class SequenceRepositoryMyHabitsImpl implements SequenceRepository {
+public class IdSequenceRepositoryMyHabitsImpl implements SequenceRepository {
 
     private final ShardedMyBatisExecutor executor;
-    public SequenceRepositoryMyHabitsImpl(ShardedMyBatisExecutor executor) {
+    public IdSequenceRepositoryMyHabitsImpl(ShardedMyBatisExecutor executor) {
         this.executor = executor;
     }
 
     @Override
-    public Segment nextSegment(SequenceName name) {
+    public Segment allocateSegment(SequenceName name) {
 
         return executor.executeInTransaction(IdGeneratorConstant.SHARED_GROUP_KEY, (myBatisClient, route) -> {
             String tableName = route.resolveTableName(IdGeneratorConstant.ID_SEQUENCE_TABLE_NAME);
