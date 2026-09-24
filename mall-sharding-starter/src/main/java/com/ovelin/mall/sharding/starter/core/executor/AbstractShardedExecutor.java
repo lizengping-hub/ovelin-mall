@@ -14,11 +14,12 @@ import java.util.function.BiFunction;
 
 public abstract class AbstractShardedExecutor<C> implements ShardedExecutor<C> {
     private final ShardRouter shardRouter;
-    private static final Logger log = LoggerFactory.getLogger(AbstractShardedExecutor.class);
 
     protected final DatabaseClientManager databaseClientManager;
 
     protected abstract C getClient(ResolvedRoute route);
+    protected abstract Logger logger();
+
     public AbstractShardedExecutor(ShardRouter shardRouter, DatabaseClientManager databaseClientManager) {
         this.shardRouter = shardRouter;
         this.databaseClientManager = databaseClientManager;
@@ -26,24 +27,28 @@ public abstract class AbstractShardedExecutor<C> implements ShardedExecutor<C> {
     @Override
     public <R> R execute(ShardGroupKey groupKey, BiFunction<C, ResolvedRoute, R> action) {
         ResolvedRoute route = shardRouter.route(groupKey);
+        logger().debug("Executing action for groupKey: {}, resolved route: {}", groupKey, route);
         return execute(route, action);
     }
 
     @Override
     public <R> R executeInTransaction(ShardGroupKey groupKey, BiFunction<C, ResolvedRoute, R> action) {
         ResolvedRoute route = shardRouter.route(groupKey);
+        logger().debug("Executing action in transaction for groupKey: {}, resolved route: {}", groupKey, route);
         return executeInTransaction(route, action);
     }
 
     @Override
     public <R> R execute(ShardGroupKey groupKey, ShardedId shardedId, BiFunction<C, ResolvedRoute, R> action){
         ResolvedRoute route = shardRouter.route(groupKey, shardedId);
+        logger().debug("Executing action for groupKey: {}, shardedId: {}, resolved route: {}", groupKey, shardedId, route);
         return execute(route, action);
     }
 
     @Override
     public <R> R executeInTransaction(ShardGroupKey groupKey, ShardedId shardedId, BiFunction<C, ResolvedRoute, R> action){
         ResolvedRoute route = shardRouter.route(groupKey, shardedId);
+        logger().debug("Executing action in transaction for groupKey: {}, shardedId: {}, resolved route: {}", groupKey, shardedId, route);
         return executeInTransaction(route, action);
     }
 

@@ -1,5 +1,6 @@
 package com.ovelin.mall.sharding.starter.core.executor;
 
+import com.ovelin.mall.sharding.starter.api.ShardedMyBatisPlusExecutor;
 import com.ovelin.mall.sharding.starter.api.client.DatabaseClientManager;
 import com.ovelin.mall.sharding.starter.api.router.ResolvedRoute;
 import com.ovelin.mall.sharding.starter.api.router.ShardRouter;
@@ -10,8 +11,8 @@ import org.slf4j.LoggerFactory;
 
 import java.util.function.BiFunction;
 
-public class ShardedMyBatisPlusExecutorImpl extends AbstractShardedExecutor<MyBatisPlusClient> {
-    private static final Logger log = LoggerFactory.getLogger(ShardedMyBatisPlusExecutorImpl.class);
+public class ShardedMyBatisPlusExecutorImpl extends AbstractShardedExecutor<MyBatisPlusClient> implements ShardedMyBatisPlusExecutor {
+    private static final Logger logger = LoggerFactory.getLogger(ShardedMyBatisPlusExecutorImpl.class);
     public ShardedMyBatisPlusExecutorImpl(DatabaseClientManager databaseClientManager, ShardRouter shardRouter) {
         super(shardRouter, databaseClientManager);
     }
@@ -20,6 +21,12 @@ public class ShardedMyBatisPlusExecutorImpl extends AbstractShardedExecutor<MyBa
     protected MyBatisPlusClient getClient(ResolvedRoute route) {
         return databaseClientManager.getMyBatisPlusClient(route.instanceKey());
     }
+
+    @Override
+    protected Logger logger() {
+        return logger;
+    }
+
     @Override
     public <R> R execute(ResolvedRoute route, BiFunction<MyBatisPlusClient, ResolvedRoute, R> action) {
         try (var ignored = TableRouteContext.use(route)) {
