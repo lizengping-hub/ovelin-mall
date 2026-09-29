@@ -11,10 +11,10 @@ import com.ovelin.mall.id.generator.starter.infrastructure.persistence.po.IdSequ
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
-public class IdSequenceRepositoryImpl implements SequenceRepository {
+public class SequenceRepositoryImpl implements SequenceRepository {
     private IdSequenceMapper idSequenceMapper;
     private IdGeneratorProperties properties;
-    public IdSequenceRepositoryImpl(IdSequenceMapper idSequenceMapper, IdGeneratorProperties properties) {
+    public SequenceRepositoryImpl(IdSequenceMapper idSequenceMapper, IdGeneratorProperties properties) {
         this.idSequenceMapper = idSequenceMapper;
         this.properties = properties;
     }
@@ -27,12 +27,8 @@ public class IdSequenceRepositoryImpl implements SequenceRepository {
     @Transactional(propagation = Propagation.REQUIRES_NEW)
     public Segment allocateSegment(SequenceName name, ShardId shardId) {
         int shardValue = shardId.value();
+        idSequenceMapper.insertIfAbsent(name.value(), shardValue);
         IdSequencePO sequence = idSequenceMapper.selectByName(name.value(), shardValue);
-        if (sequence == null) {
-            idSequenceMapper.insertIfAbsent(name.value(), shardValue);
-        }
-
-        sequence = idSequenceMapper.selectByName(name.value(), shardValue);
 
 
         Segment segment = Segment.fromStartAndSize(
