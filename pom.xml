@@ -68,6 +68,8 @@
         <module>mall-id-generator-api</module>
         <module>mall-id-generator-starter</module>
         <module>mall-sharding-starter</module>
+        <module>mall-auth</module>
+        <module>mall-session</module>
         <module>mall-bom</module>
         <module>mall-cart</module>
         <module>mall-cart-api</module>
