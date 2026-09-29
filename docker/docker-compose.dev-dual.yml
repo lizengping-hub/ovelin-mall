@@ -1,0 +1,40 @@
+services:
+  mysql-instance-0:
+    image: mysql:8.4
+    container_name: identity-dev-dual-mysql-0
+    restart: unless-stopped
+    ports:
+      - "${MYSQL_PORT_0:-3307}:3306"
+    environment:
+      MYSQL_ROOT_PASSWORD: root
+    volumes:
+      - mysql-dev-dual-0-data:/var/lib/mysql
+      - ./docker/mysql/init:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "mysqladmin ping -h localhost -u root -proot --silent"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+      start_period: 10s
+
+  mysql-instance-1:
+    image: mysql:8.4
+    container_name: identity-dev-dual-mysql-1
+    restart: unless-stopped
+    ports:
+      - "${MYSQL_PORT_1:-3308}:3306"
+    environment:
+      MYSQL_ROOT_PASSWORD: root
+    volumes:
+      - mysql-dev-dual-1-data:/var/lib/mysql
+      - ./docker/mysql/init:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "mysqladmin ping -h localhost -u root -proot --silent"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+      start_period: 10s
+
+volumes:
+  mysql-dev-dual-0-data:
+  mysql-dev-dual-1-data:

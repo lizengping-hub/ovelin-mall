@@ -1,0 +1,24 @@
+user 域：
+  user                     用户资料
+  user_address             用户地址
+
+auth 域：
+  password_credential      密码凭证
+  email_credential         邮箱凭证
+  sms_credential           短信凭证
+  oauth_credential         第三方凭证
+  login_attempt            登录尝试日志
+
+session 域：
+  session                  会话
+  session_refresh_log      刷新日志
+
+mfa 域（未来）：
+  mfa_channel              MFA 渠道
+  mfa_setting              MFA 设置
+
+Redis（临时）：
+  otp:*                    验证码
+  magic:*                  魔法链接
+  mfa:token:*              MFA 临时令牌
+  ratelimit:*              频率限制

@@ -63,8 +63,11 @@
     </build>
     <modelVersion>4.0.0</modelVersion>
     <modules>
-        <module>mall-sharding-starter</module>
+        <module>mall-common-sharding-core</module>
+        <module>mall-common-sharding-starter</module>
+        <module>mall-id-generator-api</module>
         <module>mall-id-generator-starter</module>
+        <module>mall-sharding-starter</module>
         <module>mall-bom</module>
         <module>mall-cart</module>
         <module>mall-cart-api</module>
@@ -83,7 +86,7 @@
         <module>mall-promotion-api</module>
         <module>mall-user</module>
         <module>mall-user-api</module>
-        <module>mull-inventory-api</module>
+        <module>mall-inventory-api</module>
 
     </modules>
 </project>

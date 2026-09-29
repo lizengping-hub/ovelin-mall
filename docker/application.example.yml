@@ -1,0 +1,45 @@
+ovelin:
+  sharding:
+    instances:
+      mysql-instance-0:
+        host: ${IDENTITY_DB_HOST_0:localhost}
+        port: ${IDENTITY_DB_PORT_0:3306}
+        username: ${IDENTITY_DB_USERNAME:ovelin}
+        password: ${IDENTITY_DB_PASSWORD:ovelin}
+        maximum-pool-size: 10
+      mysql-instance-1:
+        host: ${IDENTITY_DB_HOST_1:localhost}
+        port: ${IDENTITY_DB_PORT_1:3306}
+        username: ${IDENTITY_DB_USERNAME:ovelin}
+        password: ${IDENTITY_DB_PASSWORD:ovelin}
+        maximum-pool-size: 10
+    shard-routes:
+      user:
+        name: user
+        shard-count: 256
+        routes:
+          - from: 0
+            to: 127
+            instance: mysql-instance-0
+            database: user_database
+          - from: 128
+            to: 255
+            instance: mysql-instance-1
+            database: user_database
+      login:
+        name: login
+        shard-count: 256
+        routes:
+          - from: 0
+            to: 127
+            instance: mysql-instance-0
+            database: login_database
+          - from: 128
+            to: 255
+            instance: mysql-instance-1
+            database: login_database
+
+logging:
+  level:
+    com.identityservice.infrastructure.persistence: DEBUG
+    com.identityservice.config: DEBUG
