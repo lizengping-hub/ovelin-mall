@@ -1,5 +1,6 @@
 package com.ovelin.mall.sharding.starter.api;
 
+import com.ovelin.mall.common.sharding.core.ov.ShardId;
 import com.ovelin.mall.common.sharding.core.ov.ShardedId;
 import com.ovelin.mall.sharding.starter.api.excutor.ShardCalculator;
 import org.junit.jupiter.api.Test;
@@ -24,7 +25,7 @@ class ShardCalculatorTest {
     void shardIdForIsWithinCapacityRange() {
         for (int i = 0; i < 1000; i++) {
             int shardId = shardCalculator.shardIdFor("key-" + i);
-            assertThat(shardId).isBetween(0, ShardedId.MAX_SHARD_ID);
+            assertThat(shardId).isBetween(0, ShardId.SHARD_CAPACITY - 1);
         }
     }
 

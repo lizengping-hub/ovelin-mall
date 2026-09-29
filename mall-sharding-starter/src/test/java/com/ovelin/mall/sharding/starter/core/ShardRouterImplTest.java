@@ -1,5 +1,6 @@
 package com.ovelin.mall.sharding.starter.core;
 
+import com.ovelin.mall.common.sharding.core.ov.ShardId;
 import com.ovelin.mall.common.sharding.core.ov.ShardedId;
 import com.ovelin.mall.sharding.starter.api.router.ResolvedRoute;
 import com.ovelin.mall.sharding.starter.api.router.ShardGroupKey;
@@ -29,12 +30,12 @@ class ShardRouterImplTest {
                 new ShardingProperties.ShardRoute(1, 1, "mysql-1", "user_database_1"));
 
         // 逻辑空间的前一半应落在物理分片 0
-        ResolvedRoute low = router.route(USER_GROUP, ShardedId.from(0L, 0L));
+        ResolvedRoute low = router.route(USER_GROUP, ShardedId.of(0, 0L));
         assertThat(low.databaseName()).isEqualTo("user_database_0");
         assertThat(low.instanceKey()).isEqualTo("mysql-0");
 
         // 逻辑空间的后一半应落在物理分片 1
-        ResolvedRoute high = router.route(USER_GROUP, ShardedId.from(ShardedId.MAX_SHARD_ID, 0L));
+        ResolvedRoute high = router.route(USER_GROUP, ShardedId.of(ShardId.SHARD_CAPACITY - 1, 0L));
         assertThat(high.databaseName()).isEqualTo("user_database_1");
         assertThat(high.instanceKey()).isEqualTo("mysql-1");
     }
@@ -42,10 +43,10 @@ class ShardRouterImplTest {
     @Test
     void sameLogicalShardIdAlwaysResolvesToSamePhysicalRoute() {
         ShardRouterImpl router = routerWith(256, fullRangeRoute(256, "mysql-0", "user_database"));
-        long shardId = 12345L;
+        int shardId = 12345;
 
-        ResolvedRoute first = router.route(USER_GROUP, ShardedId.from(shardId, 1L));
-        ResolvedRoute second = router.route(USER_GROUP, ShardedId.from(shardId, 999L));
+        ResolvedRoute first = router.route(USER_GROUP, ShardedId.of(shardId, 1L));
+        ResolvedRoute second = router.route(USER_GROUP, ShardedId.of(shardId, 999L));
 
         assertThat(first.shardId()).isEqualTo(second.shardId());
         assertThat(first.databaseName()).isEqualTo(second.databaseName());
@@ -55,7 +56,7 @@ class ShardRouterImplTest {
     void routeThrowsWhenGroupKeyIsUnknown() {
         ShardRouterImpl router = routerWith(256, fullRangeRoute(256, "mysql-0", "user_database"));
 
-        assertThatThrownBy(() -> router.route(new ShardGroupKey("does-not-exist"), ShardedId.from(0L, 0L)))
+        assertThatThrownBy(() -> router.route(new ShardGroupKey("does-not-exist"), ShardedId.of(0, 0L)))
                 .isInstanceOf(NullPointerException.class);
     }
 
@@ -67,7 +68,7 @@ class ShardRouterImplTest {
                         "user", 1, List.of(new ShardingProperties.ShardRoute(0, 0, "missing-instance", "user_database")))));
         ShardRouterImpl router = new ShardRouterImpl(properties);
 
-        assertThatThrownBy(() -> router.route(USER_GROUP, ShardedId.from(0L, 0L)))
+        assertThatThrownBy(() -> router.route(USER_GROUP, ShardedId.of(0, 0L)))
                 .isInstanceOf(IllegalStateException.class)
                 .hasMessageContaining("Unknown database instance");
     }
