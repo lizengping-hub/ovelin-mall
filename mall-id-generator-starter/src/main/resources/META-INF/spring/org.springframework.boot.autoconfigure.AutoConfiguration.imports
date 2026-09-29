@@ -1,2 +1,2 @@
-com.ovelin.mall.id.generator.starter.autoconfigure.IdGeneratorAutoconfiguration
-com.ovelin.mall.id.generator.starter.autoconfigure.SequenceRepositoryConfiguration
+com.ovelin.mall.id.generator.starter.infrastructure.autoconfigure.IdGeneratorAutoconfiguration
+com.ovelin.mall.id.generator.starter.infrastructure.autoconfigure.SequenceRepositoryConfiguration

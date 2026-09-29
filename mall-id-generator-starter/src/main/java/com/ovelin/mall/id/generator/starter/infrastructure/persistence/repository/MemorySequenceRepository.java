@@ -1,7 +1,7 @@
 package com.ovelin.mall.id.generator.starter.infrastructure.persistence.repository;
 
 import com.ovelin.mall.common.sharding.core.ov.ShardId;
-import com.ovelin.mall.id.generator.starter.autoconfigure.IdGeneratorProperties;
+import com.ovelin.mall.id.generator.starter.infrastructure.autoconfigure.IdGeneratorProperties;
 import com.ovelin.mall.id.generator.starter.domain.module.Segment;
 import com.ovelin.mall.id.generator.starter.domain.module.valueobject.SequenceName;
 import com.ovelin.mall.id.generator.starter.domain.repository.SequenceRepository;

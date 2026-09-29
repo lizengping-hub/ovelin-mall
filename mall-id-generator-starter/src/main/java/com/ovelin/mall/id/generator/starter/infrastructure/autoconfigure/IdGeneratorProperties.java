@@ -1,4 +1,4 @@
-package com.ovelin.mall.id.generator.starter.autoconfigure;
+package com.ovelin.mall.id.generator.starter.infrastructure.autoconfigure;
 
 import jakarta.validation.constraints.Min;
 import org.springframework.boot.context.properties.ConfigurationProperties;

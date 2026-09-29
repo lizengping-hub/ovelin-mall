@@ -1,4 +1,4 @@
-package com.ovelin.mall.id.generator.starter.autoconfigure;
+package com.ovelin.mall.id.generator.starter.infrastructure.autoconfigure;
 
 import com.ovelin.mall.id.generator.starter.domain.repository.SequenceRepository;
 import com.ovelin.mall.id.generator.starter.infrastructure.persistence.mapper.IdSequenceMapper;

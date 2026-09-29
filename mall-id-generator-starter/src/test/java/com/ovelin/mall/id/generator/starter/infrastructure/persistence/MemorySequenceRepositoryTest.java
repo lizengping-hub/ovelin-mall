@@ -1,6 +1,6 @@
 package com.ovelin.mall.id.generator.starter.infrastructure.persistence;
 
-import com.ovelin.mall.id.generator.starter.autoconfigure.IdGeneratorProperties;
+import com.ovelin.mall.id.generator.starter.infrastructure.autoconfigure.IdGeneratorProperties;
 import com.ovelin.mall.id.generator.starter.domain.repository.SequenceRepository;
 import com.ovelin.mall.id.generator.starter.infrastructure.persistence.repository.MemorySequenceRepository;
 

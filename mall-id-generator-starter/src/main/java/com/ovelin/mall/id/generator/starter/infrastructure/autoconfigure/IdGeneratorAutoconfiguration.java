@@ -1,4 +1,4 @@
-package com.ovelin.mall.id.generator.starter.autoconfigure;
+package com.ovelin.mall.id.generator.starter.infrastructure.autoconfigure;
 
 
 import com.ovelin.mall.common.sharding.core.api.ShardResolver;
