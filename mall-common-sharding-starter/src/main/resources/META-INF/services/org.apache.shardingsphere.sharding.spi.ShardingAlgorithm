@@ -1,0 +1,4 @@
+com.ovelin.mall.common.sharding.starter.algorithm.OvelinDsStandardShardingAlgorithm
+com.ovelin.mall.common.sharding.starter.algorithm.OvelinTableStandardShardingAlgorithm
+com.ovelin.mall.common.sharding.starter.algorithm.OvelinDsComplexShardingAlgorithm
+com.ovelin.mall.common.sharding.starter.algorithm.OvelinTableComplexShardingAlgorithm
