@@ -9,7 +9,7 @@
         <relativePath/> <!-- lookup parent from repository -->
     </parent>
     <groupId>com.ovelin</groupId>
-    <artifactId>mull-inventory-api</artifactId>
+    <artifactId>mall-inventory-api</artifactId>
     <version>0.0.1-SNAPSHOT</version>
     <name>mull-inventory-api</name>
     <description>mull-inventory-api</description>
@@ -27,7 +27,7 @@
         <url/>
     </scm>
     <properties>
-        <java.version>26</java.version>
+        <java.version>25</java.version>
     </properties>
     <dependencies>
         <dependency>
