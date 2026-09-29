@@ -11,10 +11,10 @@ import com.ovelin.mall.id.generator.starter.infrastructure.persistence.po.IdSequ
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
-public class IdSequenceRepositoryMyHabitsImpl implements SequenceRepository {
+public class IdSequenceRepositoryImpl implements SequenceRepository {
     private IdSequenceMapper idSequenceMapper;
     private IdGeneratorProperties properties;
-    public IdSequenceRepositoryMyHabitsImpl(IdSequenceMapper idSequenceMapper, IdGeneratorProperties properties) {
+    public IdSequenceRepositoryImpl(IdSequenceMapper idSequenceMapper, IdGeneratorProperties properties) {
         this.idSequenceMapper = idSequenceMapper;
         this.properties = properties;
     }
@@ -37,8 +37,8 @@ public class IdSequenceRepositoryMyHabitsImpl implements SequenceRepository {
 
         Segment segment = Segment.fromStartAndSize(
                 sequence.nextValue(),
-                properties.getAllocationSize());
-        int updatedRows = idSequenceMapper.advance(name.value(), shardValue, properties.getAllocationSize());
+                properties.allocationSize());
+        int updatedRows = idSequenceMapper.advance(name.value(), shardValue, properties.allocationSize());
         if (updatedRows != 1) {
             throw new IllegalStateException(
                     "Failed to advance sequence: " + name.value() + " with shardId: " + shardId);

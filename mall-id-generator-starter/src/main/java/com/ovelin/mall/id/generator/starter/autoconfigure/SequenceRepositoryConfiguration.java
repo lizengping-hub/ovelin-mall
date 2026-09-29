@@ -2,9 +2,8 @@ package com.ovelin.mall.id.generator.starter.autoconfigure;
 
 import com.ovelin.mall.id.generator.starter.domain.repository.SequenceRepository;
 import com.ovelin.mall.id.generator.starter.infrastructure.persistence.mapper.IdSequenceMapper;
-import com.ovelin.mall.id.generator.starter.infrastructure.persistence.repository.IdSequenceRepositoryMyHabitsImpl;
+import com.ovelin.mall.id.generator.starter.infrastructure.persistence.repository.IdSequenceRepositoryImpl;
 import org.mybatis.spring.annotation.MapperScan;
-import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
@@ -13,6 +12,6 @@ import org.springframework.context.annotation.Configuration;
 class SequenceRepositoryConfiguration {
     @Bean
     SequenceRepository sequenceRepository(IdSequenceMapper mapper, IdGeneratorProperties properties) {
-        return new IdSequenceRepositoryMyHabitsImpl(mapper, properties);
+        return new IdSequenceRepositoryImpl(mapper, properties);
     }
 }
