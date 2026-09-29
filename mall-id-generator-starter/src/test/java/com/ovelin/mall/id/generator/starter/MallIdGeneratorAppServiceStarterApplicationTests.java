@@ -1,70 +1,49 @@
 package com.ovelin.mall.id.generator.starter;
 
-import com.ovelin.mall.id.generator.starter.domain.module.valueobject.AllocationSize;
+import com.ovelin.mall.common.sharding.core.ov.ShardId;
 import com.ovelin.mall.id.generator.starter.domain.module.Segment;
 import com.ovelin.mall.id.generator.starter.domain.module.valueobject.SequenceName;
 import com.ovelin.mall.id.generator.starter.domain.repository.SequenceRepository;
-import com.ovelin.mall.id.generator.starter.infrastructure.persistence.IdGeneratorConstant;
-import com.ovelin.mall.sharding.starter.api.excutor.ShardedJdbcExecutor;
 
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 
+import java.time.Instant;
+
 @SpringBootTest
 class MallIdGeneratorAppServiceStarterApplicationTests {
-    @Autowired
-    ShardedJdbcExecutor shardTransactionExecutor;
     @Autowired
     SequenceRepository sequenceRepository;
     @Test
     void contextLoads() {
-        if (shardTransactionExecutor == null) {
-            throw new IllegalStateException("shardTransactionExecutor is null");
-        }
         if (sequenceRepository == null) {
             throw new IllegalStateException("sequenceRepository is null");
         }
-        shardTransactionExecutor.execute(IdGeneratorConstant.SHARED_GROUP_KEY, (jdbcTemplate, route) -> {
-            jdbcTemplate.execute("SELECT * FROM " + route.resolveTableName(IdGeneratorConstant.ID_SEQUENCE_TABLE_NAME));
-            return null;
-        });
-        sequenceRepository.initIfAbsent(new SequenceName("test_sequence"), new AllocationSize(1000));
     }
 
     @Test
-    void testShardedJdbcExecutor() {
-        if (shardTransactionExecutor == null) {
-            throw new IllegalStateException("shardTransactionExecutor is null");
-        }
-        shardTransactionExecutor.execute(IdGeneratorConstant.SHARED_GROUP_KEY, (jdbcTemplate, route) -> {
-            jdbcTemplate.execute("SELECT * FROM " + route.resolveTableName(IdGeneratorConstant.ID_SEQUENCE_TABLE_NAME));
-            return null;
-        });
-    }
-    @Test
-    void testSequenceRepository() {
+    void testSequenceRepository() throws InterruptedException {
         if (sequenceRepository == null) {
             throw new IllegalStateException("sequenceRepository is null");
         }
-        int allocationSize = 1000;
-        sequenceRepository.initIfAbsent(new SequenceName("test_sequence"), new AllocationSize(allocationSize));
-        Segment lastSegment = null;
+        SequenceName name = new SequenceName("test_sequence");
+
         for (int i = 0; i < 10; i++) {
-            Segment segment = sequenceRepository.allocateSegment(new SequenceName("test_sequence"));
-//            System.out.println("Next segment: " + segment);
-            if (lastSegment != null) {
-                if (segment.minValue() != lastSegment.minValue() + lastSegment.size()) {
-                    throw new IllegalStateException("Segments are not contiguous last: " + lastSegment + " and new " + segment);
+            ShardId shardId = ShardId.of(1000);
+            Segment lastSegment = null;
+            for (int j = 0; j < 10; j++) {
+                Segment segment = sequenceRepository.allocateSegment(name, shardId);
+                System.out.println("Next segment: " + segment);
+                if (lastSegment != null) {
+                    if (segment.minValue() != lastSegment.minValue() + lastSegment.size()) {
+                        throw new IllegalStateException("Segments are not contiguous last: " + lastSegment + " and new " + segment);
+                    }
                 }
+                lastSegment = segment;
+                System.out.println("Current time: " +Instant.now().toString());
+
             }
-
-            lastSegment = segment;
-
         }
-
-
     }
-
-
 }

@@ -1,6 +1,7 @@
 package com.ovelin.mall.id.generator.starter.domain.module.service;
 
-import com.ovelin.mall.id.generator.starter.benchmark.TestSequenceRepository;
+
+import com.ovelin.mall.common.sharding.core.ov.ShardId;
 import com.ovelin.mall.id.generator.starter.domain.module.valueobject.SequenceName;
 import com.ovelin.mall.id.generator.starter.domain.service.SequenceDomainService;
 import org.junit.jupiter.api.Test;
@@ -46,6 +47,7 @@ public class SequenceDomainServiceTest {
             allocationCount.addAndGet(count);
             return sequenceDomainService.nextValues(
                     new SequenceName("test-sequence"),
+                    ShardId.of(1000),
                     count
             ).toArray();
         });
@@ -59,7 +61,7 @@ public class SequenceDomainServiceTest {
     void testNextId(int threadsCount, int loopCountPerThread) {
         SequenceDomainService sequenceDomainService = new SequenceDomainService(new TestSequenceRepository());
         TestResult testResult = test(threadsCount, loopCountPerThread, (x, y) -> {
-            long id = sequenceDomainService.nextValue(new SequenceName("test-sequence"));
+            long id = sequenceDomainService.nextValue(new SequenceName("test-sequence"), ShardId.of(1000));
             return new long[]{id};
         });
         AtomicInteger errorCount = testResult.errorCount();

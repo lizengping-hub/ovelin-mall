@@ -8,7 +8,9 @@ public record SequenceName(@NotNull String value) {
             throw new IllegalArgumentException("Sequence name cannot be null or empty");
         }
     }
-
+    public static SequenceName of(String value) {
+        return new SequenceName(value);
+    }
     @Override
     @NotNull
     public String toString() {

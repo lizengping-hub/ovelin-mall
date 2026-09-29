@@ -1,34 +1,29 @@
 package com.ovelin.mall.id.generator.starter.autoconfigure;
 
-import com.ovelin.mall.id.generator.starter.infrastructure.persistence.IdGeneratorConstant;
+
+import com.ovelin.mall.common.sharding.core.api.ShardResolver;
+import com.ovelin.mall.id.generator.api.IdGenerator;
+import com.ovelin.mall.id.generator.starter.IdGeneratorAppService;
 import com.ovelin.mall.id.generator.starter.domain.repository.SequenceRepository;
-import com.ovelin.mall.id.generator.starter.infrastructure.persistence.repository.IdSequenceRepositoryMyHabitsImpl;
-import com.ovelin.mall.sharding.starter.api.excutor.ShardedMyBatisExecutor;
-import com.ovelin.mall.sharding.starter.api.router.ShardingProperties;
-import jakarta.annotation.PostConstruct;
+import com.ovelin.mall.id.generator.starter.domain.service.IdGeneratorDomainService;
+import com.ovelin.mall.id.generator.starter.domain.service.SequenceDomainService;
+import org.springframework.boot.autoconfigure.AutoConfiguration;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.annotation.Bean;
-import org.springframework.context.annotation.Configuration;
 
-@Configuration
-@EnableConfigurationProperties(ShardingProperties.class)
+@AutoConfiguration
+@EnableConfigurationProperties(IdGeneratorProperties.class)
 public class IdGeneratorAutoconfiguration {
-
-    private final ShardingProperties shardingProperties;
-
-    public IdGeneratorAutoconfiguration(ShardingProperties shardingProperties) {
-        this.shardingProperties = shardingProperties;
-    }
-
-    @PostConstruct
-    public void validateShardingProperties() {
-        if (shardingProperties.getShardGroup(IdGeneratorConstant.SHARED_GROUP_KEY) == null) {
-            throw new IllegalStateException("Shard group not found: " + IdGeneratorConstant.SHARED_GROUP_KEY);
-        }
-    }
-
     @Bean
-    public SequenceRepository sequenceRepository(ShardedMyBatisExecutor shardedMyBatisExecutor) {
-        return new IdSequenceRepositoryMyHabitsImpl(shardedMyBatisExecutor);
+    IdGenerator idGenerator(IdGeneratorDomainService idGeneratorDomainService) {
+        return new IdGeneratorAppService(idGeneratorDomainService);
+    }
+    @Bean
+    IdGeneratorDomainService idGeneratorDomainService(SequenceDomainService sequenceService, ShardResolver shardResolver) {
+        return new IdGeneratorDomainService(sequenceService, shardResolver);
+    }
+    @Bean
+    SequenceDomainService sequenceDomainService(SequenceRepository sequenceRepository) {
+        return new SequenceDomainService(sequenceRepository);
     }
 }

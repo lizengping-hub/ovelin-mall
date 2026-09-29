@@ -1,12 +1,12 @@
 spring:
   application:
     name: mall-id-generator-starter
-ovelin:
-  sharding:
 
 server:
   port: 8080
-
+id-generator:
+  repository: myhabits
+  allocation-size: 1000
 logging:
   file:
     name: logs/identity-service.log

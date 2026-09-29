@@ -11,32 +11,32 @@ import org.apache.ibatis.annotations.Update;
 public interface IdSequenceMapper {
 
     @Insert("""
-            INSERT INTO ${tableName} (sequence_name, next_value, allocation_size)
-            VALUES (#{sequenceName}, 0, #{allocationSize})
+            INSERT INTO id_sequence (sequence_name, shard_id, next_value)
+            VALUES (#{sequenceName}, #{shardId}, 0)
             ON DUPLICATE KEY UPDATE sequence_name = sequence_name
             """)
     int insertIfAbsent(
-            @Param("tableName") String tableName,
             @Param("sequenceName") String sequenceName,
-            @Param("allocationSize") int allocationSize);
+            @Param("shardId") int shardId);
 
     @Select("""
-            SELECT sequence_name, next_value, allocation_size, version
-            FROM ${tableName}
-            WHERE sequence_name = #{sequenceName}
+            SELECT sequence_name, shard_id, next_value, version
+            FROM id_sequence
+            WHERE sequence_name = #{sequenceName} and shard_id = #{shardId}
             FOR UPDATE
             """)
     IdSequencePO selectByName(
-            @Param("tableName") String tableName,
-            @Param("sequenceName") String sequenceName);
+            @Param("sequenceName") String sequenceName,
+            @Param("shardId") int shardId);
 
     @Update("""
-            UPDATE ${tableName}
-            SET next_value = next_value + allocation_size,
+            UPDATE id_sequence
+            SET next_value = next_value + #{allocationSize},
                 version = version + 1
-            WHERE sequence_name = #{sequenceName}
+            WHERE sequence_name = #{sequenceName} and shard_id = #{shardId}
             """)
     int advance(
-            @Param("tableName") String tableName,
-            @Param("sequenceName") String sequenceName);
+            @Param("sequenceName") String sequenceName,
+            @Param("shardId") int shardId,
+            @Param("allocationSize") int allocationSize);
 }

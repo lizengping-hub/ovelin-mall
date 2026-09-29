@@ -1,4 +1,4 @@
-package com.ovelin.mall.id.generator.starter.application.dto;
+package com.ovelin.mall.id.generator.api;
 
 import java.util.Objects;
 
