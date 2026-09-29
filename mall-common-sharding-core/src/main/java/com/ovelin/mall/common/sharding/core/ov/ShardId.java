@@ -7,7 +7,7 @@ public record ShardId(int value) {
             throw new IllegalArgumentException("shardId must be between 0 and "+IdLayout.MAX_SHARD);
         }
     }
-    public static  ShardId of(int value) {
+    public static ShardId of(int value) {
         return new ShardId(value);
     }
 }

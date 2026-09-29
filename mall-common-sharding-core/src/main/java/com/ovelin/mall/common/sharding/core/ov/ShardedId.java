@@ -15,6 +15,9 @@ public final class ShardedId implements Identifier {
         IdLayout.validateSequence(sequence);
         return new ShardedId((sequence << IdLayout.SHARD_BITS) | shard.value());
     }
+    public static ShardedId of(int shard, long sequence) {
+        return of(ShardId.of(shard), sequence);
+    }
     public static int shardOf(long id) {
         requireNonNegative(id);
         return (int) (id & IdLayout.MAX_SHARD);
@@ -32,5 +35,13 @@ public final class ShardedId implements Identifier {
     @Override
     public int hashCode() { return Long.hashCode(id); }
     @Override
-    public String toString() { return "0x" + Long.toHexString(id); }
+    public String toString() { return toHexString(); }
+    public String toHexString() { return "0x"+Long.toHexString(id); }
+    @Override
+    public boolean equals(Object obj) {
+        if (this == obj) return true;
+        if (obj == null || getClass() != obj.getClass()) return false;
+        ShardedId other = (ShardedId) obj;
+        return this.id == other.id;
+    }
 }
