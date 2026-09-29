@@ -1,6 +1,6 @@
 package com.ovelin.mall.sharding.starter.core.executor;
 
-import com.ovelin.mall.sharding.starter.api.ShardedMyBatisPlusExecutor;
+import com.ovelin.mall.sharding.starter.api.excutor.ShardedMyBatisPlusExecutor;
 import com.ovelin.mall.sharding.starter.api.client.DatabaseClientManager;
 import com.ovelin.mall.sharding.starter.api.router.ResolvedRoute;
 import com.ovelin.mall.sharding.starter.api.router.ShardRouter;

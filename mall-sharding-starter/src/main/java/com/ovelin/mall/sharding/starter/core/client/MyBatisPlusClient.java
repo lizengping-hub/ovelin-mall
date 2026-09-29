@@ -12,6 +12,8 @@ import com.ovelin.mall.sharding.starter.api.router.ResolvedRoute;
 import org.apache.ibatis.session.Configuration;
 import org.apache.ibatis.session.SqlSessionFactory;
 import org.mybatis.spring.SqlSessionTemplate;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.AnnotatedBeanDefinition;
 import org.springframework.beans.factory.config.BeanDefinition;
 import org.springframework.context.annotation.ClassPathScanningCandidateComponentProvider;
@@ -21,6 +23,7 @@ import javax.sql.DataSource;
 import java.util.Objects;
 
 public class MyBatisPlusClient {
+    private static final Logger logger = LoggerFactory.getLogger(MyBatisPlusClient.class);
     // 拦截器无状态，可以所有实例共用一份
     private static final MybatisPlusInterceptor PLUGIN_INTERCEPTOR = buildInterceptor();
 
@@ -67,7 +70,9 @@ public class MyBatisPlusClient {
                         "No shard route in context for table '" + tableName +
                                 "'. Must be called through ShardedMyBatisPlusExecutor.");
             }
-            return route.resolveTableName(tableName);
+            String resolvedTableName = route.resolveTableName(tableName);
+            logger.debug("Resolved table name '{}' for original table '{}'", resolvedTableName, tableName);
+            return resolvedTableName;
         });
         interceptor.addInnerInterceptor(dynamicTableName);
         interceptor.addInnerInterceptor(new PaginationInnerInterceptor(DbType.MYSQL));

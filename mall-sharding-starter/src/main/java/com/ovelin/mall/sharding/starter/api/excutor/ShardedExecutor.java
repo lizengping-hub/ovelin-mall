@@ -1,8 +1,8 @@
 package com.ovelin.mall.sharding.starter.api.excutor;
 
+import com.ovelin.mall.common.sharding.core.ov.ShardedId;
 import com.ovelin.mall.sharding.starter.api.router.ResolvedRoute;
 import com.ovelin.mall.sharding.starter.api.router.ShardGroupKey;
-import com.ovelin.mall.sharding.starter.api.ShardedId;
 
 import java.util.function.BiFunction;
 
@@ -16,7 +16,7 @@ public interface ShardedExecutor<C> {
     /** 不分片，使用分片组默认数据源，不开事务。 */
     <R> R execute(ShardGroupKey groupKey, BiFunction<C, ResolvedRoute, R> action);
 
-    /** 不分片，使用分片组默认数据源，开单库事务。 */
+        /** 不分片，使用分片组默认数据源，开单库事务。 */
     <R> R executeInTransaction(ShardGroupKey groupKey, BiFunction<C, ResolvedRoute, R> action);
 
     /** 使用已解析路由，不开事务。 */

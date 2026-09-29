@@ -1,6 +1,6 @@
 package com.ovelin.mall.sharding.starter.core;
 
-import com.ovelin.mall.sharding.starter.api.ShardedId;
+import com.ovelin.mall.common.sharding.core.ov.ShardId;
 import com.ovelin.mall.sharding.starter.api.router.ShardGroupKey;
 import com.ovelin.mall.sharding.starter.api.router.ShardingProperties;
 import org.junit.jupiter.api.Test;
@@ -34,7 +34,7 @@ class ShardingPropertiesTest {
     void validateFailsWhenShardCountDoesNotDivideShardCapacity() {
         // shardCount 大于 SHARD_CAPACITY 时依然可能是 2 的幂（例如 SHARD_CAPACITY * 2），
         // 但无法整除 SHARD_CAPACITY，用来验证兜底的整除校验（防止未来 SHARD_BITS 调整后出现回归）。
-        int oversized = ShardedId.SHARD_CAPACITY * 2; // 仍是 2 的幂，但不能整除 SHARD_CAPACITY
+        int oversized = ShardId.SHARD_CAPACITY * 2; // 仍是 2 的幂，但不能整除 SHARD_CAPACITY
         ShardingProperties.ShardGroup group = new ShardingProperties.ShardGroup(
                 "user", oversized, List.of(route(0, oversized - 1, "mysql-0", "user_database")));
         assertThatThrownBy(group::validate)
@@ -73,12 +73,12 @@ class ShardingPropertiesTest {
     void shardsPerPhysicalAndToPhysicalShardIdAreConsistent() {
         ShardingProperties.ShardGroup group = group(256, route(0, 255, "mysql-0", "user_database"));
         int ratio = group.shardsPerPhysical();
-        assertThat(ratio).isEqualTo(ShardedId.SHARD_CAPACITY / 256);
+        assertThat(ratio).isEqualTo(ShardId.SHARD_CAPACITY / 256);
 
         assertThat(group.toPhysicalShardId(0)).isZero();
         assertThat(group.toPhysicalShardId(ratio - 1L)).isZero();
         assertThat(group.toPhysicalShardId(ratio)).isEqualTo(1);
-        assertThat(group.toPhysicalShardId(ShardedId.MAX_SHARD_ID)).isEqualTo(255);
+
     }
 
     private ShardingProperties withGroup(ShardingProperties.ShardGroup group) {

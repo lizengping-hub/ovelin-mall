@@ -1,13 +1,12 @@
 package com.ovelin.mall.sharding.starter.core.executor;
 
-import com.ovelin.mall.sharding.starter.api.*;
+import com.ovelin.mall.common.sharding.core.ov.ShardedId;
 import com.ovelin.mall.sharding.starter.api.client.DatabaseClientManager;
 import com.ovelin.mall.sharding.starter.api.excutor.ShardedExecutor;
 import com.ovelin.mall.sharding.starter.api.router.ResolvedRoute;
 import com.ovelin.mall.sharding.starter.api.router.ShardGroupKey;
 import com.ovelin.mall.sharding.starter.api.router.ShardRouter;
 import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import org.springframework.transaction.support.TransactionTemplate;
 
 import java.util.function.BiFunction;
@@ -24,6 +23,7 @@ public abstract class AbstractShardedExecutor<C> implements ShardedExecutor<C> {
         this.shardRouter = shardRouter;
         this.databaseClientManager = databaseClientManager;
     }
+
     @Override
     public <R> R execute(ShardGroupKey groupKey, BiFunction<C, ResolvedRoute, R> action) {
         ResolvedRoute route = shardRouter.route(groupKey);

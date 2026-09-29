@@ -1,6 +1,6 @@
 package com.ovelin.mall.sharding.starter.api.excutor;
 
-import com.ovelin.mall.sharding.starter.api.ShardedId;
+import com.ovelin.mall.common.sharding.core.ov.ShardId;
 
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
@@ -13,7 +13,7 @@ public class ShardCalculator {
                 | ((long) (hash[1] & 0xff) << 16)
                 | ((long) (hash[2] & 0xff) << 8)
                 | (hash[3] & 0xffL);
-        return (int) (unsignedPrefix % ShardedId.SHARD_CAPACITY);
+        return (int) (unsignedPrefix % ShardId.SHARD_CAPACITY);
     }
 
     private byte[] sha256(String shardKey) {

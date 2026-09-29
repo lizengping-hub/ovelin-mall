@@ -1,6 +1,6 @@
 package com.ovelin.mall.sharding.starter.api.router;
 
-import com.ovelin.mall.sharding.starter.api.ShardedId;
+import com.ovelin.mall.common.sharding.core.ov.ShardedId;
 
 public interface ShardRouter {
     /**

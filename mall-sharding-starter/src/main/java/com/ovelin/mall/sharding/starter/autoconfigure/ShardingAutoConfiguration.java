@@ -1,9 +1,9 @@
 package com.ovelin.mall.sharding.starter.autoconfigure;
 
-import com.ovelin.mall.sharding.starter.api.*;
 import com.ovelin.mall.sharding.starter.api.client.DatabaseClientManager;
 import com.ovelin.mall.sharding.starter.api.excutor.ShardedJdbcExecutor;
 import com.ovelin.mall.sharding.starter.api.excutor.ShardedMyBatisExecutor;
+import com.ovelin.mall.sharding.starter.api.excutor.ShardedMyBatisPlusExecutor;
 import com.ovelin.mall.sharding.starter.api.router.ShardRouter;
 import com.ovelin.mall.sharding.starter.api.router.ShardingProperties;
 import com.ovelin.mall.sharding.starter.core.*;

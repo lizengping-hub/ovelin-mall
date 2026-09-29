@@ -19,7 +19,13 @@ public final class TableRouteContext {
     public static UncheckedCloseable use(ResolvedRoute route) {
         ResolvedRoute previous = ROUTE.get();
         ROUTE.set(route);
-        return () -> ROUTE.set(previous);
+        return () -> {
+            if (previous == null) {
+                ROUTE.remove();
+            } else {
+                ROUTE.set(previous);
+            }
+        };
     }
 
 }

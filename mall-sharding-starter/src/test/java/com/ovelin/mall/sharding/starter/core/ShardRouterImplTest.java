@@ -1,6 +1,6 @@
 package com.ovelin.mall.sharding.starter.core;
 
-import com.ovelin.mall.sharding.starter.api.ShardedId;
+import com.ovelin.mall.common.sharding.core.ov.ShardedId;
 import com.ovelin.mall.sharding.starter.api.router.ResolvedRoute;
 import com.ovelin.mall.sharding.starter.api.router.ShardGroupKey;
 import com.ovelin.mall.sharding.starter.api.router.ShardingProperties;

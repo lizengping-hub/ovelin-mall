@@ -1,5 +1,6 @@
 package com.ovelin.mall.sharding.starter.api;
 
+import com.ovelin.mall.common.sharding.core.ov.ShardedId;
 import com.ovelin.mall.sharding.starter.api.excutor.ShardCalculator;
 import org.junit.jupiter.api.Test;
 

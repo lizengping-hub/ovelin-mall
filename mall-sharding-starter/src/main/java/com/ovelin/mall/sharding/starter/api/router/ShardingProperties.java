@@ -1,6 +1,6 @@
 package com.ovelin.mall.sharding.starter.api.router;
 
-import com.ovelin.mall.sharding.starter.api.ShardedId;
+import com.ovelin.mall.common.sharding.core.ov.ShardId;
 import com.ovelin.mall.sharding.starter.core.ShardingConfigurationException;
 import jakarta.annotation.PostConstruct;
 import jakarta.validation.Valid;
@@ -78,7 +78,7 @@ public record ShardingProperties(
         @NotBlank
         String name,
         @Min(value = 1, message = "Shard count must be at least 1")
-        @Max(value = ShardedId.SHARD_CAPACITY, message = "Shard count must be at most " + ShardedId.SHARD_CAPACITY)
+        @Max(value = ShardId.SHARD_CAPACITY, message = "Shard count must be at most " + ShardId.SHARD_CAPACITY)
         int shardCount,
         List<@Valid ShardRoute> routes
     ) {
@@ -86,9 +86,9 @@ public record ShardingProperties(
             if (!isPowerOfTwo(this.shardCount())) {
                 throw new ShardingConfigurationException("Shard count must be a power of two");
             }
-            if (ShardedId.SHARD_CAPACITY % this.shardCount() != 0) {
+            if (ShardId.SHARD_CAPACITY % this.shardCount() != 0) {
                 throw new ShardingConfigurationException(
-                        "Shard count must evenly divide " + ShardedId.SHARD_CAPACITY);
+                        "Shard count must evenly divide " + ShardId.SHARD_CAPACITY);
             }
         }
         public static boolean isPowerOfTwo(int n) {
@@ -100,7 +100,7 @@ public record ShardingProperties(
          * 由于两者都保证为 2 的幂，这里永远整除。
          */
         public int shardsPerPhysical() {
-            return ShardedId.SHARD_CAPACITY / this.shardCount();
+            return ShardId.SHARD_CAPACITY / this.shardCount();
         }
 
         /**

@@ -1,6 +1,6 @@
 package com.ovelin.mall.sharding.starter.core;
 
-import com.ovelin.mall.sharding.starter.api.*;
+import com.ovelin.mall.common.sharding.core.ov.ShardedId;
 import com.ovelin.mall.sharding.starter.api.router.ResolvedRoute;
 import com.ovelin.mall.sharding.starter.api.router.ShardGroupKey;
 import com.ovelin.mall.sharding.starter.api.router.ShardRouter;
@@ -35,10 +35,7 @@ public class ShardRouterImpl implements ShardRouter {
     public ResolvedRoute route(ShardGroupKey groupKey, ShardedId shardedId) {
         ShardingProperties.ShardGroup shardGroup = properties.getShardGroup(groupKey); // Ensure the group exists
 
-        long logicalShardId = shardedId.getShardId();
-        if (logicalShardId < 0 || logicalShardId > ShardedId.MAX_SHARD_ID) {
-            throw new IllegalArgumentException("Shard ID out of range: " + logicalShardId);
-        }
+        long logicalShardId = shardedId.shardId().value();
         // 逻辑 shardId 空间(0..SHARD_CAPACITY-1)折算为当前实际配置的物理分片索引(0..shardCount-1)
         int shardId = shardGroup.toPhysicalShardId(logicalShardId);
 
