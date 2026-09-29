@@ -1,6 +1,5 @@
 package com.ovelin.mall.id.generator.starter.infrastructure.persistence;
 
-import com.ovelin.mall.common.sharding.starter.autoconfigure.ShardingSphereAutoConfiguration;
 import com.ovelin.mall.common.sharding.core.api.ShardResolver;
 import com.ovelin.mall.common.sharding.core.core.RandomShardResolver;
 import com.ovelin.mall.id.generator.starter.domain.repository.SequenceRepository;
@@ -8,7 +7,6 @@ import com.ovelin.mall.id.generator.starter.infrastructure.persistence.repositor
 import org.junit.jupiter.api.BeforeEach;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.autoconfigure.EnableAutoConfiguration;
-import org.springframework.boot.autoconfigure.ImportAutoConfiguration;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.ApplicationContext;
@@ -26,9 +24,6 @@ import java.util.Optional;
  * 直接 new 出来的对象没有事务代理,所以必须通过 Spring 容器拿到(或创建)实例。
  * 数据库使用和生产同类型的 MySQL,而不是 H2。
  */
-@ImportAutoConfiguration(
-        exclude = ShardingSphereAutoConfiguration.class
-)
 @SpringBootTest(classes = JdbcSequenceRepositoryTest.TestApp.class)
 @EnableAutoConfiguration
 @Testcontainers
