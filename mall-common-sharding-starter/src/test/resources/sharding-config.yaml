@@ -27,50 +27,50 @@ dataSources:
 
 
 rules:
-  - !SHARDING
-    tables:
-      user:
-        actualDataNodes: user_ds$->{0..1}.user_$->{0..1}
-        databaseStrategy:
-          standard:
-            shardingColumn: id
-            shardingAlgorithmName: ovelin_db_algo
-        tableStrategy:
-          standard:
-            shardingColumn: id
-            shardingAlgorithmName: ovelin_table_algo
-      user_identity:
-        actualDataNodes: identity_ds$->{0..1}.user_identity_$->{0..1}
-        databaseStrategy:
-          complex:
-            shardingColumns: id, user_id
-            shardingAlgorithmName: ovelin_db_complex_algo
-        tableStrategy:
-          complex:
-            shardingColumns: id, user_id
-            shardingAlgorithmName: ovelin_table_complex_algo
+- !SHARDING
+  tables:
+    user:
+      actualDataNodes: user_ds$->{0..1}.user_$->{0..1}
+      databaseStrategy:
+        standard:
+          shardingColumn: id
+          shardingAlgorithmName: ovelin_db_algo
+      tableStrategy:
+        standard:
+          shardingColumn: id
+          shardingAlgorithmName: ovelin_table_algo
+    user_identity:
+      actualDataNodes: identity_ds$->{0..1}.user_identity_$->{0..1}
+      databaseStrategy:
+        complex:
+          shardingColumns: id, user_id
+          shardingAlgorithmName: ovelin_db_complex_algo
+      tableStrategy:
+        complex:
+          shardingColumns: id, user_id
+          shardingAlgorithmName: ovelin_table_complex_algo
 
-    shardingAlgorithms:
-      ovelin_db_algo:
-        type: OVELIN_DS_STANDARD_SHARDING
-        props:
-          table-count: 2
-          ds-count: 2
-      ovelin_table_algo:
-        type: OVELIN_TABLE_STANDARD_SHARDING
-        props:
-          table-count: 2
-          ds-count: 2
-      ovelin_db_complex_algo:
-        type: OVELIN_DS_COMPLEX_SHARDING
-        props:
-          table-count: 2
-          ds-count: 2
-      ovelin_table_complex_algo:
-        type: OVELIN_TABLE_COMPLEX_SHARDING
-        props:
-          table-count: 2
-          ds-count: 2
+  shardingAlgorithms:
+    ovelin_db_algo:
+      type: OVELIN_DS_STANDARD_SHARDING
+      props:
+        table-count: 2
+        ds-count: 2
+    ovelin_table_algo:
+      type: OVELIN_TABLE_STANDARD_SHARDING
+      props:
+        table-count: 2
+        ds-count: 2
+    ovelin_db_complex_algo:
+      type: OVELIN_DS_COMPLEX_SHARDING
+      props:
+        table-count: 2
+        ds-count: 2
+    ovelin_table_complex_algo:
+      type: OVELIN_TABLE_COMPLEX_SHARDING
+      props:
+        table-count: 2
+        ds-count: 2
 
 props:
   sql-show: true

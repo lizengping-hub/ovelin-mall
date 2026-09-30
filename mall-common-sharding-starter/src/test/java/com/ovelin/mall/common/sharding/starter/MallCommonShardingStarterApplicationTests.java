@@ -13,6 +13,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 
 import java.sql.SQLException;
+import java.time.Instant;
 import java.time.LocalDateTime;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -38,20 +39,20 @@ class MallCommonShardingStarterApplicationTests {
         long userId = ShardedId.of(shardId, System.currentTimeMillis()).value();
         long identityId = ShardedId.of(shardId, System.currentTimeMillis()).value();
 
-        IdentityPO identity = new IdentityPO();
-        identity.setId(identityId);
-        identity.setUserId(userId);
-        identity.setIdentityType("test");
-        identity.setNormalizedIdentifier("test-identifier"+System.currentTimeMillis());
-        identity.setIsPrimary(1);
-        identity.setVerifiedAt(LocalDateTime.now());
-        identity.setLastLoginAt(LocalDateTime.now());
-        identity.setCreatedAt(LocalDateTime.now());
-        identity.setUpdatedAt(identity.getCreatedAt());
-        userIdentityMapper.insert(identity);
-        System.out.println("Inserted user identity ID: " + identityId);
-        IdentityPO identityPO = userIdentityMapper.selectById(identityId);
-        System.out.println("Inserted user identity: " + identityPO);
+//        IdentityPO identity = new IdentityPO();
+//        identity.setId(identityId);
+//        identity.setUserId(userId);
+//        identity.setIdentityType("test");
+//        identity.setNormalizedIdentifier("test-identifier"+System.currentTimeMillis());
+//        identity.setIsPrimary(1);
+//        identity.setVerifiedAt(LocalDateTime.now());
+//        identity.setLastLoginAt(LocalDateTime.now());
+//        identity.setCreatedAt(LocalDateTime.now());
+//        identity.setUpdatedAt(identity.getCreatedAt());
+//        userIdentityMapper.insert(identity);
+//        System.out.println("Inserted user identity ID: " + identityId);
+//        IdentityPO identityPO = userIdentityMapper.selectById(identityId);
+//        System.out.println("Inserted user identity: " + identityPO);
         UserPO user = new UserPO();
         user.setId(userId);
         user.setUsername("test-user");
@@ -60,7 +61,7 @@ class MallCommonShardingStarterApplicationTests {
         user.setEmail("test-user@example.com");
         user.setStatus(1);
         user.setRegisterSource("test");
-        user.setCreatedAt(LocalDateTime.now());
+        user.setCreatedAt(Instant.EPOCH);
         user.setUpdatedAt(user.getCreatedAt());
         int inserted = userMapper.insert(user);
 
