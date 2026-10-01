@@ -3,7 +3,6 @@ spring:
     name: id-generator-service
 
 id-generator:
-  repository: myhabits
   allocation-size: 1000
 
 server:
