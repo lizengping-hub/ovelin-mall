@@ -3,14 +3,11 @@
          xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
     <modelVersion>4.0.0</modelVersion>
     <parent>
-        <groupId>org.springframework.boot</groupId>
-        <artifactId>spring-boot-starter-parent</artifactId>
-        <version>4.1.1</version>
-        <relativePath/> <!-- lookup parent from repository -->
+        <groupId>com.ovelin</groupId>
+        <artifactId>ovelin-mall</artifactId>
+        <version>0.0.1-SNAPSHOT</version>
     </parent>
-    <groupId>com.ovelin</groupId>
     <artifactId>mall-ddd-kernel</artifactId>
-    <version>0.0.1-SNAPSHOT</version>
     <name>mall-ddd-kernel</name>
     <description>通用 DDD 战术模式基础接口（Entity/AggregateRoot/Identifier 等），不依赖任何具体基础设施</description>
     <url/>
@@ -27,19 +24,8 @@
         <url/>
     </scm>
     <properties>
-        <java.version>25</java.version>
     </properties>
     <dependencies>
-        <dependency>
-            <groupId>org.junit.jupiter</groupId>
-            <artifactId>junit-jupiter</artifactId>
-            <scope>test</scope>
-        </dependency>
-        <dependency>
-            <groupId>org.assertj</groupId>
-            <artifactId>assertj-core</artifactId>
-            <scope>test</scope>
-        </dependency>
     </dependencies>
 
     <build>
