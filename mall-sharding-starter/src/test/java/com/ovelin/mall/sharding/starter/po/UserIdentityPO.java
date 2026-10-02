@@ -10,10 +10,10 @@ import java.time.LocalDateTime;
 /**
  * 用户登录身份/凭证表 PO
  * 仅作为数据库映射对象，不承载业务逻辑
- * 对应表：user_identity
+ * 对应表：test_user_identity
  */
 @Data
-@TableName("user_identity")
+@TableName("test_user_identity")
 public class UserIdentityPO {
 
     private Long id;

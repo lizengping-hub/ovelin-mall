@@ -12,6 +12,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 
+import java.time.Instant;
 import java.time.LocalDateTime;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -31,14 +32,12 @@ class MallShardingStarterApplicationTests {
         long userId = ShardedId.of(0, System.currentTimeMillis()).value();
         UserPO user = new UserPO();
         user.setId(userId);
-        user.setUsername("test-user");
+        user.setDisplayName("test-user");
         user.setPhoneE164("+8613800138000");
         user.setPhoneRawInput("13800138000");
         user.setEmail("test-user@example.com");
         user.setStatus(1);
         user.setRegisterSource("test");
-        user.setCreatedAt(LocalDateTime.now());
-        user.setUpdatedAt(user.getCreatedAt());
 
         int inserted = userShardGroupExecutor.execute(
                 ShardedId.fromId(userId),

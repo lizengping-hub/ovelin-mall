@@ -38,6 +38,15 @@
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-validation</artifactId>
         </dependency>
+        <dependency>
+            <groupId>com.ovelin</groupId>
+            <artifactId>mall-ddd-kernel</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>com.ovelin</groupId>
+            <artifactId>mall-common-sharding-core</artifactId>
+        </dependency>
+
         <!-- MyBatis 与 Spring 集成（提供 SqlSessionFactoryBean、SqlSessionTemplate） -->
         <dependency>
             <groupId>org.mybatis</groupId>

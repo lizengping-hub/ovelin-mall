@@ -17,14 +17,6 @@ ovelin:
         password: ${IDENTITY_DB_PASSWORD:ovelin}
         maximum-pool-size: 10
     shard-routes:
-      id-generator:
-        name: id-generator
-        shard-count: 1
-        routes:
-          - from: 0
-            to: 0
-            instance: mysql-instance-0
-            database: shared_database
       user:
         name: user
         shard-count: 256
