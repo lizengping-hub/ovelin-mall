@@ -25,7 +25,7 @@ public interface IdSequenceMapper {
             WHERE sequence_name = #{sequenceName} and shard_id = #{shardId}
             FOR UPDATE
             """)
-    IdSequencePO selectByName(
+    IdSequencePO selectBySequenceNameAndShardId(
             @Param("sequenceName") String sequenceName,
             @Param("shardId") int shardId);
 

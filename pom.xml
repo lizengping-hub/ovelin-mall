@@ -29,6 +29,7 @@
     </scm>
     <properties>
         <java.version>25</java.version>
+        <shardingsphere.version>5.5.3</shardingsphere.version>
     </properties>
     <dependencyManagement>
         <dependencies>
@@ -47,6 +48,12 @@
                 <artifactId>mall-common-sharding-starter</artifactId>
                 <version>${project.version}</version>
                 <scope>runtime</scope>
+            </dependency>
+            <dependency>
+                <groupId>com.ovelin</groupId>
+                <artifactId>mall-common-sharding-test-support</artifactId>
+                <version>${project.version}</version>
+                <scope>test</scope>
             </dependency>
             <dependency>
                 <groupId>com.ovelin</groupId>
@@ -71,7 +78,7 @@
             </dependency>
             <dependency>
                 <groupId>com.ovelin</groupId>
-                <artifactId>mall-common-test</artifactId>
+                <artifactId>mall-common-test-environment-support</artifactId>
                 <version>${project.version}</version>
                 <scope>test</scope>
             </dependency>
@@ -104,13 +111,42 @@
                     </annotationProcessorPaths>
                 </configuration>
             </plugin>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-failsafe-plugin</artifactId>
+            </plugin>
+            <plugin>
+                <groupId>org.codehaus.mojo</groupId>
+                <artifactId>build-helper-maven-plugin</artifactId>
+                <executions>
+                    <execution>
+                        <id>add-it-sources</id>
+                        <phase>generate-test-sources</phase>
+                        <goals><goal>add-test-source</goal></goals>
+                        <configuration>
+                            <sources><source>src/it/java</source></sources>
+                        </configuration>
+                    </execution>
+                    <execution>
+                        <id>add-it-resources</id>
+                        <phase>generate-test-resources</phase>
+                        <goals><goal>add-test-resource</goal></goals>
+                        <configuration>
+                            <resources>
+                                <resource><directory>src/it/resources</directory></resource>
+                            </resources>
+                        </configuration>
+                    </execution>
+                </executions>
+            </plugin>
+
         </plugins>
     </build>
-
     <modules>
-        <module>mall-common-test</module>
+        <module>mall-common-test-environment-support</module>
         <module>mall-common-sharding-core</module>
         <module>mall-common-sharding-starter</module>
+        <module>mall-common-sharding-test-support</module>
         <module>mall-id-generator-api</module>
         <module>mall-id-generator-starter</module>
         <module>mall-auth</module>
@@ -134,6 +170,7 @@
         <module>mall-user</module>
         <module>mall-user-api</module>
         <module>mall-inventory-api</module>
+
 
     </modules>
 

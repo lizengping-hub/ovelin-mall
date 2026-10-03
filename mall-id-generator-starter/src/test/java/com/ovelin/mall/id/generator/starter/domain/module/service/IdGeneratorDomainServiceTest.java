@@ -1,6 +1,6 @@
 package com.ovelin.mall.id.generator.starter.domain.module.service;
 
-import com.ovelin.mall.common.sharding.core.api.ShardResolver;
+import com.ovelin.mall.common.sharding.core.api.ShardSelector;
 import com.ovelin.mall.common.sharding.core.ov.ShardId;
 import com.ovelin.mall.common.sharding.core.ov.ShardedId;
 import com.ovelin.mall.id.generator.starter.domain.module.valueobject.Allocations;
@@ -21,7 +21,7 @@ import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
 
 /**
- * mock 掉序列服务和 ShardResolver:分片为 null 走 resolver、指定分片不碰 resolver、count<=0 提前失败、异常透传
+ * mock 掉序列服务和 SharSelector:分片为 null 走 selector、指定分片不碰 selector、count<=0 提前失败、异常透传
  */
 @ExtendWith(MockitoExtension.class)
 class IdGeneratorDomainServiceTest {
@@ -33,20 +33,21 @@ class IdGeneratorDomainServiceTest {
 
     @Mock
     SequenceDomainService sequenceService;
-    @Mock ShardResolver shardResolver;
+    @Mock
+    ShardSelector shardSelector;
 
     IdGeneratorDomainService domainService;
 
     @BeforeEach
     void setUp() {
-        domainService = new IdGeneratorDomainService(sequenceService, shardResolver);
+        domainService = new IdGeneratorDomainService(sequenceService, shardSelector);
     }
 
     // ---------- nextId ----------
 
     @Test
     void nextIdShouldUseResolverWhenShardNotSpecified() {
-        when(shardResolver.currentShard()).thenReturn(RESOLVED);
+        when(shardSelector.select()).thenReturn(RESOLVED);
         when(sequenceService.nextValue(ORDER, RESOLVED)).thenReturn(12345L);
 
         ShardedId id = domainService.nextId(ORDER, null);
@@ -62,7 +63,7 @@ class IdGeneratorDomainServiceTest {
         ShardedId id = domainService.nextId(ORDER, SPECIFIED);
 
         assertEquals(SPECIFIED, id.shardId());
-        verifyNoInteractions(shardResolver);
+        verifyNoInteractions(shardSelector);
     }
 
     @Test
@@ -91,7 +92,7 @@ class IdGeneratorDomainServiceTest {
         // 假设 Allocations.toList() 返回 List<Long>;若 Allocations 是 final 类,需要 mockito 5+(inline mock maker)
         Allocations allocations = mock(Allocations.class);
         when(allocations.toList()).thenReturn(List.of(10L, 11L, 12L));
-        when(shardResolver.currentShard()).thenReturn(RESOLVED);
+        when(shardSelector.select()).thenReturn(RESOLVED);
         when(sequenceService.nextValues(ORDER, RESOLVED, 3)).thenReturn(allocations);
 
         List<ShardedId> ids = domainService.nextIds(ORDER, null, 3);
@@ -110,7 +111,7 @@ class IdGeneratorDomainServiceTest {
         List<ShardedId> ids = domainService.nextIds(ORDER, SPECIFIED, 2);
 
         assertEquals(2, ids.size());
-        verifyNoInteractions(shardResolver);
+        verifyNoInteractions(shardSelector);
     }
 
     @ParameterizedTest
@@ -119,6 +120,6 @@ class IdGeneratorDomainServiceTest {
         assertThrows(IllegalArgumentException.class,
                 () -> domainService.nextIds(ORDER, SPECIFIED, count));
 
-        verifyNoInteractions(sequenceService, shardResolver);
+        verifyNoInteractions(sequenceService, shardSelector);
     }
 }

@@ -1,15 +1,10 @@
-package com.ovelin.mall.id.generator.starter.infrastructure.persistence;
+package com.ovelin.mall.id.generator.starter.infrastructure.persistence.repository.it;
 
-import com.ovelin.mall.common.sharding.core.api.ShardResolver;
-import com.ovelin.mall.common.sharding.core.core.RandomShardResolver;
-import com.ovelin.mall.id.generator.starter.TestApplication;
 import com.ovelin.mall.id.generator.starter.domain.repository.SequenceRepository;
 import com.ovelin.mall.id.generator.starter.infrastructure.persistence.repository.SequenceRepositoryImpl;
 import org.junit.jupiter.api.BeforeEach;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.autoconfigure.EnableAutoConfiguration;
 import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.context.annotation.Bean;
 import org.springframework.context.ApplicationContext;
 import org.springframework.jdbc.core.JdbcTemplate;
 import java.util.Optional;
@@ -20,7 +15,7 @@ import java.util.Optional;
  * 数据库使用和生产同类型的 MySQL,而不是 H2。
  */
 @SpringBootTest()
-public class JdbcSequenceRepositoryTest extends SequenceRepositoryContractTest {
+public class JdbcSequenceRepositoryIT extends SequenceRepositoryContractIT {
 
     @Autowired
     SequenceRepository repository;

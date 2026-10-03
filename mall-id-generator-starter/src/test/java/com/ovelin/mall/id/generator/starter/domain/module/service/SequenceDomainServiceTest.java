@@ -38,7 +38,6 @@ class SequenceDomainServiceTest {
     /** 假设 MemorySequenceRepository(n) 的 n 是每个 Segment 的容量;小容量便于覆盖换段逻辑 */
     static final int SEGMENT_SIZE = ID_GENERATOR_PROPERTIES.allocationSize();
 
-    // TODO: 按 SequenceName 的实际构造方式调整(new / of)
     static final SequenceName ORDER = new SequenceName("order");
     static final SequenceName USER = new SequenceName("user");
     static final ShardId SHARD_1 = ShardId.of(1);

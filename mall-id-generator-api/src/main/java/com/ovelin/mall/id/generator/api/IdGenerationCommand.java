@@ -14,7 +14,7 @@ import java.util.Optional;
  */
 public final class IdGenerationCommand {
     private final BusinessType businessType;
-    private final ShardId shardId;      // null = not specified, the domain side picks one via ShardResolver
+    private final ShardId shardId;      // null = not specified, the domain side picks one via ShardSelector
     private final String tenantId;      // optional
     private final int count;            // number of ids requested, >= 1
     private final String traceId;       // optional
@@ -43,7 +43,9 @@ public final class IdGenerationCommand {
     public static Builder builder(String businessType) {
         return new Builder(new BusinessType(businessType));
     }
-
+    public static Builder builder(BusinessType businessType) {
+        return new Builder(businessType);
+    }
     public static final class Builder {
         private final BusinessType businessType;
         private ShardId shardId;

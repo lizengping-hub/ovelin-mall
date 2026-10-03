@@ -60,6 +60,22 @@
             <artifactId>mall-common-sharding-starter</artifactId>
             <scope>test</scope>
         </dependency>
+        <dependency>
+            <groupId>com.ovelin</groupId>
+            <artifactId>mall-common-sharding-test-support</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>com.ovelin</groupId>
+            <artifactId>mall-common-test-environment-support</artifactId>
+        </dependency>
     </dependencies>
+    <build>
+        <plugins>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-failsafe-plugin</artifactId>
+            </plugin>
+        </plugins>
+    </build>
 
 </project>

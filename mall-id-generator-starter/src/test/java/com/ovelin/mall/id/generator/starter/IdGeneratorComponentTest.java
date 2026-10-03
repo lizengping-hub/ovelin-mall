@@ -1,6 +1,6 @@
 package com.ovelin.mall.id.generator.starter;
 
-import com.ovelin.mall.common.sharding.core.api.ShardResolver;
+import com.ovelin.mall.common.sharding.core.api.ShardSelector;
 import com.ovelin.mall.common.sharding.core.ov.ShardId;
 import com.ovelin.mall.common.sharding.core.ov.ShardedId;
 import com.ovelin.mall.id.generator.api.IdDTO;
@@ -43,8 +43,8 @@ class IdGeneratorComponentTest {
     void setUp() {
         IdGeneratorProperties properties = new IdGeneratorProperties(100);
         SequenceRepository repository = new MemorySequenceRepository(properties);
-        ShardResolver resolver = mock(ShardResolver.class);
-        when(resolver.currentShard()).thenReturn(DEFAULT_SHARD);
+        ShardSelector resolver = mock(ShardSelector.class);
+        when(resolver.select()).thenReturn(DEFAULT_SHARD);
 
         idGenerator = new IdGeneratorAppService(
                 new IdGeneratorDomainService(new SequenceDomainService(repository), resolver));

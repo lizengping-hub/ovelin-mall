@@ -28,7 +28,7 @@ public class SequenceRepositoryImpl implements SequenceRepository {
     public Segment allocateSegment(SequenceName name, ShardId shardId) {
         int shardValue = shardId.value();
         idSequenceMapper.insertIfAbsent(name.value(), shardValue);
-        IdSequencePO sequence = idSequenceMapper.selectByName(name.value(), shardValue);
+        IdSequencePO sequence = idSequenceMapper.selectBySequenceNameAndShardId(name.value(), shardValue);
 
 
         Segment segment = Segment.fromStartAndSize(

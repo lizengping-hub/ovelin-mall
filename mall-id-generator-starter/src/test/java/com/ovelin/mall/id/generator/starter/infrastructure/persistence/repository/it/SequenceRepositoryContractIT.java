@@ -1,4 +1,4 @@
-package com.ovelin.mall.id.generator.starter.infrastructure.persistence; // TODO: 调整为测试所在的实际包
+package com.ovelin.mall.id.generator.starter.infrastructure.persistence.repository.it; // TODO: 调整为测试所在的实际包
 
 import com.ovelin.mall.common.sharding.core.ov.ShardId;
 import com.ovelin.mall.id.generator.starter.domain.module.Segment;
@@ -28,9 +28,8 @@ import static org.junit.jupiter.api.Assumptions.assumeTrue;
  * 契约里的"连续性"(相邻号段首尾相接、号段内逐个 +1)是当前设计的假设;
  * 如果你允许号段之间有空洞,把 {@link #assertContiguous} 放宽为"严格递增"即可。
  */
-abstract class SequenceRepositoryContractTest {
+abstract class SequenceRepositoryContractIT {
 
-    // TODO: 按 SequenceName 的实际构造方式调整
     static final SequenceName ORDER = new SequenceName("order");
     static final SequenceName USER = new SequenceName("user");
     static final ShardId SHARD_1 = ShardId.of(1);
