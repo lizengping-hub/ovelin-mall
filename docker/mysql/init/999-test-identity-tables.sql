@@ -1,4 +1,4 @@
-USE login_database;
+USE sharding_test_identity_database;
 
 DELIMITER //
 
@@ -8,17 +8,11 @@ BEGIN
     DECLARE suffix CHAR(4);
     WHILE shard_id < 2 DO
         SET @statement_text = CONCAT(
-            'CREATE TABLE IF NOT EXISTS login_database.user_identity_', shard_id, ' (',
+            'CREATE TABLE IF NOT EXISTS sharding_test_identity_database.sharding_test_identity_', shard_id, ' (',
                 'id BIGINT NOT NULL COMMENT ''身份记录ID'',',
                 'user_id BIGINT NOT NULL COMMENT ''用户ID'',',
                 'identity_type VARCHAR(20) NOT NULL COMMENT ''username / phone / email'',',
                 'identifier VARCHAR(255) NOT NULL COMMENT ''标准化登录标识'',',
-                'is_primary TINYINT NOT NULL DEFAULT 0,',
-                'verified_at TIMESTAMP(3) NULL,',
-                'last_login_at TIMESTAMP(3) NULL,',
-                'created_at TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),',
-                'updated_at TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3)
-                        ON UPDATE CURRENT_TIMESTAMP(3),',
                 'PRIMARY KEY (id),',
                 'UNIQUE KEY uk_identifier (identifier),',
                 'KEY idx_user_id (user_id)',

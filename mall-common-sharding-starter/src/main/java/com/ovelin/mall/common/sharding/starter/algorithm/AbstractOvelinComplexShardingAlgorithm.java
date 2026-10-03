@@ -1,6 +1,5 @@
 package com.ovelin.mall.common.sharding.starter.algorithm;
 
-import com.ovelin.mall.common.sharding.core.ov.ShardedId;
 import org.apache.shardingsphere.sharding.api.sharding.complex.ComplexKeysShardingAlgorithm;
 import org.apache.shardingsphere.sharding.api.sharding.complex.ComplexKeysShardingValue;
 
@@ -9,6 +8,12 @@ import java.util.stream.Collectors;
 
 abstract class AbstractOvelinComplexShardingAlgorithm extends AbstractOvelinShardingAlgorithm<Comparable<?>> implements ComplexKeysShardingAlgorithm<Comparable<?>> {
 
+    /**
+     * doSharding for data source or table name, if sharding value is range query, return all available target names
+     * @param availableTargetNames available data sources or table names
+     * @param shardingValue sharding value
+     * @return
+     */
     @Override
     public Collection<String> doSharding(Collection<String> availableTargetNames, ComplexKeysShardingValue<Comparable<?>> shardingValue) {
         if (shardingValue.getColumnNameAndRangeValuesMap() != null && !shardingValue.getColumnNameAndRangeValuesMap().isEmpty()) {
@@ -17,25 +22,25 @@ abstract class AbstractOvelinComplexShardingAlgorithm extends AbstractOvelinShar
 
         Map<String, Collection<Comparable<?>>> values =
                 shardingValue.getColumnNameAndShardingValuesMap();
-        Collection<Comparable<?>> idValues = null;
-        for (Collection<Comparable<?>> valueCollection : values.values()) {
-            if (valueCollection != null && !valueCollection.isEmpty()) {
-                idValues = valueCollection;
+        Collection<Comparable<?>> shardKeys = null;
+        for (Collection<Comparable<?>> valuesCollection : values.values()) {
+            if (valuesCollection != null && !valuesCollection.isEmpty()) {
+                shardKeys = valuesCollection;
                 break;
             }
         }
-        if (idValues == null) {
+        if (shardKeys == null) {
             return availableTargetNames;
         }
-        if (idValues.size() == 1) {
-            Comparable<?> idObject = idValues.iterator().next();
-            long dbIndex = doSharding(idObject);
-            return availableTargetNames.stream().filter(target -> target.endsWith(String.valueOf(dbIndex))).collect(Collectors.toSet());
+        if (shardKeys.size() == 1) {
+            Comparable<?> shardKey = shardKeys.iterator().next();
+            int resolvedIndex = resolveIndex(shardKey);
+            return availableTargetNames.stream().filter(target -> target.endsWith(String.valueOf(resolvedIndex))).collect(Collectors.toSet());
         } else {
-            Set<Long> dbIndexes = idValues.stream().map(this::doSharding).collect(Collectors.toSet());
+            Set<String> resolvedIndexes = shardKeys.stream().map(this::resolveIndex).map(String::valueOf).collect(Collectors.toSet());
             return availableTargetNames.stream().filter(target -> {
-                for (Long dbIndex : dbIndexes) {
-                    if (target.endsWith(String.valueOf(dbIndex))) {
+                for (String resolvedIndex : resolvedIndexes) {
+                    if (target.endsWith(resolvedIndex)) {
                         return true;
                     }
                 }

@@ -1,0 +1,42 @@
+spring:
+  application:
+    name: id-generator-service
+
+id-generator:
+  allocation-size: 1000
+
+server:
+  port: 8080
+
+logging:
+  file:
+    name: logs/sharding-starter.log
+  pattern:
+    console: "%d{yyyy-MM-dd HH:mm:ss.SSS} [%X{requestId:-}] %-5level [%thread] %logger{36} - %msg%n"
+    file: "%d{yyyy-MM-dd HH:mm:ss.SSS} [%X{requestId:-}] %-5level [%thread] %logger{36} - %msg%n"
+  level:
+    root: ${LOG_LEVEL_ROOT:INFO}
+    com.ovelin.mall.common.sharding.starter: ${LOG_LEVEL_APP:INFO}
+    com.ovelin.mall.common.sharding.starter.repository: ${LOG_LEVEL_REPOSITORY:DEBUG}
+    com.ovelin.mall.common.sharding.starter.config: ${LOG_LEVEL_DATABASE:DEBUG}
+    org:
+      springframework:
+        web: ${LOG_LEVEL_SPRING_WEB:INFO}
+        jdbc:
+          core;: ${LOG_LEVEL_SPRING_JDBC:DEBUG}
+    com.zaxxer.hikari: ${LOG_LEVEL_HIKARI:INFO}
+  logback:
+    rollingpolicy:
+      max-file-size: 10MB
+      max-history: 30
+      total-size-cap: 500MB
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
+  endpoint:
+    health:
+      probes:
+        enabled: true

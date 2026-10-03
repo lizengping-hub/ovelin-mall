@@ -1,9 +1,12 @@
 package com.ovelin.mall.common.sharding.starter.algorithm;
 
+import com.ovelin.mall.common.sharding.core.core.HashShardResolver;
+import com.ovelin.mall.common.sharding.core.ov.ShardId;
+
 public class OvelinDsComplexShardingAlgorithm extends AbstractOvelinComplexShardingAlgorithm {
     @Override
-    protected long doSharding(long shardId) {
-        return ShardCalculator.shardingDsIndex(shardId, dsCount, tableCount);
+    protected int resolveIndex(ShardId shardId) {
+        return dataSourceIndexResolver.resolve(shardId, dsCount, tableCount);
     }
 
     @Override

@@ -1,25 +1,25 @@
 
 dataSources:
   user_ds0:
-    jdbcUrl: jdbc:mysql://127.0.0.1:3306/user_database?allowPublicKeyRetrieval=true&useSSL=false&serverTimezone=UTC
+    jdbcUrl: jdbc:mysql://127.0.0.1:3308/sharding_test_user_database?allowPublicKeyRetrieval=true&useSSL=false&serverTimezone=UTC
     dataSourceClassName: com.zaxxer.hikari.HikariDataSource
     driverClassName: com.mysql.cj.jdbc.Driver
     username: ovelin
     password: ovelin
   user_ds1:
-    jdbcUrl: jdbc:mysql://127.0.0.1:3307/user_database?allowPublicKeyRetrieval=true&useSSL=false&serverTimezone=UTC
+    jdbcUrl: jdbc:mysql://127.0.0.1:3309/sharding_test_user_database?allowPublicKeyRetrieval=true&useSSL=false&serverTimezone=UTC
     dataSourceClassName: com.zaxxer.hikari.HikariDataSource
     driverClassName: com.mysql.cj.jdbc.Driver
     username: ovelin
     password: ovelin
   identity_ds0:
-    jdbcUrl: jdbc:mysql://127.0.0.1:3306/login_database?allowPublicKeyRetrieval=true&useSSL=false&serverTimezone=UTC
+    jdbcUrl: jdbc:mysql://127.0.0.1:3308/sharding_test_identity_database?allowPublicKeyRetrieval=true&useSSL=false&serverTimezone=UTC
     dataSourceClassName: com.zaxxer.hikari.HikariDataSource
     driverClassName: com.mysql.cj.jdbc.Driver
     username: ovelin
     password: ovelin
   identity_ds1:
-    jdbcUrl: jdbc:mysql://127.0.0.1:3307/login_database?allowPublicKeyRetrieval=true&useSSL=false&serverTimezone=UTC
+    jdbcUrl: jdbc:mysql://127.0.0.1:3309/sharding_test_identity_database?allowPublicKeyRetrieval=true&useSSL=false&serverTimezone=UTC
     dataSourceClassName: com.zaxxer.hikari.HikariDataSource
     driverClassName: com.mysql.cj.jdbc.Driver
     username: ovelin
@@ -29,8 +29,8 @@ dataSources:
 rules:
 - !SHARDING
   tables:
-    user:
-      actualDataNodes: user_ds$->{0..1}.user_$->{0..1}
+    sharding_test_user:
+      actualDataNodes: user_ds$->{0..1}.sharding_test_user_$->{0..1}
       databaseStrategy:
         standard:
           shardingColumn: id
@@ -39,15 +39,15 @@ rules:
         standard:
           shardingColumn: id
           shardingAlgorithmName: ovelin_table_algo
-    user_identity:
-      actualDataNodes: identity_ds$->{0..1}.user_identity_$->{0..1}
+    sharding_test_identity:
+      actualDataNodes: identity_ds$->{0..1}.sharding_test_identity_$->{0..1}
       databaseStrategy:
         complex:
-          shardingColumns: id, user_id
+          shardingColumns: id, identifier
           shardingAlgorithmName: ovelin_db_complex_algo
       tableStrategy:
         complex:
-          shardingColumns: id, user_id
+          shardingColumns: id, identifier
           shardingAlgorithmName: ovelin_table_complex_algo
 
   shardingAlgorithms:

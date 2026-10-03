@@ -1,8 +1,8 @@
 package com.ovelin.mall.common.sharding.starter.algorithm;
 
-import com.google.common.collect.Range;
+
 import com.ovelin.mall.common.sharding.core.ov.ShardedId;
-import org.apache.shardingsphere.sharding.api.sharding.complex.ComplexKeysShardingValue;
+import com.ovelin.mall.common.sharding.starter.utils.SequenceShardKeyResolver;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 
@@ -10,107 +10,106 @@ import java.util.*;
 
 import static org.junit.jupiter.api.Assertions.*;
 
-public class OvelinDsComplexShardingAlgorithmTest {
-    private final static OvelinDsComplexShardingAlgorithm OVELIN_DS_COMPLEX_SHARDING_ALGORITHM_1 = new OvelinDsComplexShardingAlgorithm();
-    private final static Collection<String> AVAILABLE_TARGET_DS_NAMES_1 = new HashSet<>();
-
-    private final static OvelinDsComplexShardingAlgorithm OVELIN_DS_COMPLEX_SHARDING_ALGORITHM_2 = new OvelinDsComplexShardingAlgorithm();
-    private final static Collection<String> AVAILABLE_TARGET_DS_NAMES_2 = new HashSet<>();
+public class OvelinDsComplexShardingAlgorithmTest extends AbstractComplexShardingAlgorithmTest{
+    private final static OvelinDsComplexShardingAlgorithm ALGORITHM_2_2 = new OvelinDsComplexShardingAlgorithm();
+    private final static OvelinDsComplexShardingAlgorithm ALGORITHM_4_2 = new OvelinDsComplexShardingAlgorithm();
+    private final static OvelinDsComplexShardingAlgorithm ALGORITHM_4_4 = new OvelinDsComplexShardingAlgorithm();
     @BeforeAll
     static void setUp() {
-        Properties properties = new Properties();
-        properties.setProperty("ds-count", "2");;
-        properties.setProperty("table-count", "2");
-        OVELIN_DS_COMPLEX_SHARDING_ALGORITHM_1.init(properties);
-        AVAILABLE_TARGET_DS_NAMES_1.add("ds0");
-        AVAILABLE_TARGET_DS_NAMES_1.add("ds1");
+        ALGORITHM_2_2.init(CONFIG_2_2.properties());
 
-        properties = new Properties();
-        properties.setProperty("ds-count", "4");;
-        properties.setProperty("table-count", "2");
-        OVELIN_DS_COMPLEX_SHARDING_ALGORITHM_2.init(properties);
-        AVAILABLE_TARGET_DS_NAMES_2.add("ds0");
-        AVAILABLE_TARGET_DS_NAMES_2.add("ds1");
-        AVAILABLE_TARGET_DS_NAMES_2.add("ds2");
-        AVAILABLE_TARGET_DS_NAMES_2.add("ds3");
+
+        ALGORITHM_4_2.init(CONFIG_4_2.properties());
+
+        ALGORITHM_4_4.init(CONFIG_4_4.properties());
+
 
     }
     @Test
-    void shouldShardingShardedIdConfig1(){
-        shouldShardingShardedId(OVELIN_DS_COMPLEX_SHARDING_ALGORITHM_1, AVAILABLE_TARGET_DS_NAMES_1, ShardedId.of(0, System.currentTimeMillis()), "ds0");
-        shouldShardingShardedId(OVELIN_DS_COMPLEX_SHARDING_ALGORITHM_1, AVAILABLE_TARGET_DS_NAMES_1, ShardedId.of(1, System.currentTimeMillis()), "ds0");
-        shouldShardingShardedId(OVELIN_DS_COMPLEX_SHARDING_ALGORITHM_1, AVAILABLE_TARGET_DS_NAMES_1, ShardedId.of(2, System.currentTimeMillis()), "ds1");
-        shouldShardingShardedId(OVELIN_DS_COMPLEX_SHARDING_ALGORITHM_1, AVAILABLE_TARGET_DS_NAMES_1, ShardedId.of(3, System.currentTimeMillis()), "ds1");
-        shouldShardingShardedId(OVELIN_DS_COMPLEX_SHARDING_ALGORITHM_1, AVAILABLE_TARGET_DS_NAMES_1, ShardedId.of(4, System.currentTimeMillis()), "ds0");
-        shouldShardingShardedId(OVELIN_DS_COMPLEX_SHARDING_ALGORITHM_1, AVAILABLE_TARGET_DS_NAMES_1, ShardedId.of(5, System.currentTimeMillis()), "ds0");
-        shouldShardingShardedId(OVELIN_DS_COMPLEX_SHARDING_ALGORITHM_1, AVAILABLE_TARGET_DS_NAMES_1, ShardedId.of(6, System.currentTimeMillis()), "ds1");
-        shouldShardingShardedId(OVELIN_DS_COMPLEX_SHARDING_ALGORITHM_1, AVAILABLE_TARGET_DS_NAMES_1, ShardedId.of(7, System.currentTimeMillis()), "ds1");
-    }
-    @Test
-    void shouldShardingShardedIdConfig2(){
-        shouldShardingShardedId(OVELIN_DS_COMPLEX_SHARDING_ALGORITHM_2, AVAILABLE_TARGET_DS_NAMES_2, ShardedId.of(0, System.currentTimeMillis()), "ds0");
-        shouldShardingShardedId(OVELIN_DS_COMPLEX_SHARDING_ALGORITHM_2, AVAILABLE_TARGET_DS_NAMES_2, ShardedId.of(1, System.currentTimeMillis()), "ds0");
-        shouldShardingShardedId(OVELIN_DS_COMPLEX_SHARDING_ALGORITHM_2, AVAILABLE_TARGET_DS_NAMES_2, ShardedId.of(2, System.currentTimeMillis()), "ds1");
-        shouldShardingShardedId(OVELIN_DS_COMPLEX_SHARDING_ALGORITHM_2, AVAILABLE_TARGET_DS_NAMES_2, ShardedId.of(3, System.currentTimeMillis()), "ds1");
-        shouldShardingShardedId(OVELIN_DS_COMPLEX_SHARDING_ALGORITHM_2, AVAILABLE_TARGET_DS_NAMES_2, ShardedId.of(4, System.currentTimeMillis()), "ds2");
-        shouldShardingShardedId(OVELIN_DS_COMPLEX_SHARDING_ALGORITHM_2, AVAILABLE_TARGET_DS_NAMES_2, ShardedId.of(5, System.currentTimeMillis()), "ds2");
-        shouldShardingShardedId(OVELIN_DS_COMPLEX_SHARDING_ALGORITHM_2, AVAILABLE_TARGET_DS_NAMES_2, ShardedId.of(6, System.currentTimeMillis()), "ds3");
-        shouldShardingShardedId(OVELIN_DS_COMPLEX_SHARDING_ALGORITHM_2, AVAILABLE_TARGET_DS_NAMES_2, ShardedId.of(7, System.currentTimeMillis()), "ds3");
-    }
-
-    List<Map.Entry<Integer, String>> getEntriesForShardingKeys(int shardCount){
-        HashMap<Integer, String> shardIdMap = new HashMap<>();
-        for (int i = 0; i < 1000; i++) {
-            String shardingKey = "user:" + i;
-            int shardId = ShardCalculator.shardIdFor(shardingKey);
-            if (shardId % shardCount ==0){
-                shardIdMap.put(shardId, shardingKey);
-            }
-            if (shardIdMap.size() == shardCount){
-                break;
-            }
-        }
-        if (shardIdMap.size() < shardCount){
-            throw new IllegalStateException("Not enough sharding keys found for the given shard count");
-        }
-        return List.copyOf(shardIdMap.entrySet()).stream().sorted(Comparator.comparingInt(Map.Entry::getKey)).toList();
-    }
-    @Test
-    void shouldShardingStringFieldConfig1(){
-        List<Map.Entry<Integer, String>> shardingKeys = getEntriesForShardingKeys(8);
-        shardingKeys.forEach(System.out::println);
-        for (int i = 0; i < 8; i++) {
-            Map.Entry<Integer, String> entry = shardingKeys.get(i);
-            shouldShardingShardedId(OVELIN_DS_COMPLEX_SHARDING_ALGORITHM_1, AVAILABLE_TARGET_DS_NAMES_1, entry.getKey(), entry.getValue(), "ds" + (entry.getKey() % (4 * 2) / 2));
-        }
+    void shouldShardingShardedIdConfig2_2(){
+        shouldShardingShardedId(ALGORITHM_2_2, CONFIG_2_2, ShardedId.of(0, System.currentTimeMillis()), "ds0");
+        shouldShardingShardedId(ALGORITHM_2_2, CONFIG_2_2, ShardedId.of(1, System.currentTimeMillis()), "ds0");
+        shouldShardingShardedId(ALGORITHM_2_2, CONFIG_2_2, ShardedId.of(2, System.currentTimeMillis()), "ds1");
+        shouldShardingShardedId(ALGORITHM_2_2, CONFIG_2_2, ShardedId.of(3, System.currentTimeMillis()), "ds1");
+        shouldShardingShardedId(ALGORITHM_2_2, CONFIG_2_2, ShardedId.of(4, System.currentTimeMillis()), "ds0");
+        shouldShardingShardedId(ALGORITHM_2_2, CONFIG_2_2, ShardedId.of(5, System.currentTimeMillis()), "ds0");
+        shouldShardingShardedId(ALGORITHM_2_2, CONFIG_2_2, ShardedId.of(6, System.currentTimeMillis()), "ds1");
+        shouldShardingShardedId(ALGORITHM_2_2, CONFIG_2_2, ShardedId.of(7, System.currentTimeMillis()), "ds1");
     }
 
     @Test
-    void shouldShardingStringFieldConfig2(){
-        List<Map.Entry<Integer, String>> shardingKeys = getEntriesForShardingKeys(8);
-        shardingKeys.forEach(System.out::println);
-        for (int i = 0; i < 8; i++) {
-            Map.Entry<Integer, String> entry = shardingKeys.get(i);
-            shouldShardingShardedId(OVELIN_DS_COMPLEX_SHARDING_ALGORITHM_1, AVAILABLE_TARGET_DS_NAMES_1, entry.getKey(), entry.getValue(), "ds" + (entry.getKey() % (2 * 2) / 2));
-        }
+    void shouldShardingShardedIdConfig4_2(){
+        shouldShardingShardedId(ALGORITHM_4_2, CONFIG_4_2, ShardedId.of(0, System.currentTimeMillis()), "ds0");
+        shouldShardingShardedId(ALGORITHM_4_2, CONFIG_4_2, ShardedId.of(1, System.currentTimeMillis()), "ds0");
+        shouldShardingShardedId(ALGORITHM_4_2, CONFIG_4_2, ShardedId.of(2, System.currentTimeMillis()), "ds1");
+        shouldShardingShardedId(ALGORITHM_4_2, CONFIG_4_2, ShardedId.of(3, System.currentTimeMillis()), "ds1");
+        shouldShardingShardedId(ALGORITHM_4_2, CONFIG_4_2, ShardedId.of(4, System.currentTimeMillis()), "ds2");
+        shouldShardingShardedId(ALGORITHM_4_2, CONFIG_4_2, ShardedId.of(5, System.currentTimeMillis()), "ds2");
+        shouldShardingShardedId(ALGORITHM_4_2, CONFIG_4_2, ShardedId.of(6, System.currentTimeMillis()), "ds3");
+        shouldShardingShardedId(ALGORITHM_4_2, CONFIG_4_2, ShardedId.of(7, System.currentTimeMillis()), "ds3");
     }
 
-    void shouldShardingShardedId(OvelinDsComplexShardingAlgorithm ovelinDsComplexShardingAlgorithm, Collection<String> availableTargetDsNames, int shardId, String shardingKey, String ds) {
-        HashMap<String, Collection<Comparable<?>>> columnNameAndShardingValuesMap = new HashMap<>();
-        columnNameAndShardingValuesMap.put("k", new HashSet<>(List.of(shardingKey)));
-        columnNameAndShardingValuesMap.put("k2", new HashSet<>(List.of(ShardedId.of(shardId, System.currentTimeMillis()).value())));
-        Map<String, Range<Comparable<?>>> columnNameAndRangeValuesMap = new HashMap<>();
-        ComplexKeysShardingValue<Comparable<?>> shardingValue = new ComplexKeysShardingValue<>("table", columnNameAndShardingValuesMap, columnNameAndRangeValuesMap);
-        Collection<String> resultDsNames = ovelinDsComplexShardingAlgorithm.doSharding(availableTargetDsNames, shardingValue);
-        assertEquals(Set.of(ds), resultDsNames);
+
+    @Test
+    void shouldShardingShardedIdConfig4_4(){
+        shouldShardingShardedId(ALGORITHM_4_4, CONFIG_4_4, ShardedId.of(0, System.currentTimeMillis()), "ds0");
+        shouldShardingShardedId(ALGORITHM_4_4, CONFIG_4_4, ShardedId.of(1, System.currentTimeMillis()), "ds0");
+        shouldShardingShardedId(ALGORITHM_4_4, CONFIG_4_4, ShardedId.of(2, System.currentTimeMillis()), "ds0");
+        shouldShardingShardedId(ALGORITHM_4_4, CONFIG_4_4, ShardedId.of(3, System.currentTimeMillis()), "ds0");
+        shouldShardingShardedId(ALGORITHM_4_4, CONFIG_4_4, ShardedId.of(4, System.currentTimeMillis()), "ds1");
+        shouldShardingShardedId(ALGORITHM_4_4, CONFIG_4_4, ShardedId.of(5, System.currentTimeMillis()), "ds1");
+        shouldShardingShardedId(ALGORITHM_4_4, CONFIG_4_4, ShardedId.of(6, System.currentTimeMillis()), "ds1");
+        shouldShardingShardedId(ALGORITHM_4_4, CONFIG_4_4, ShardedId.of(7, System.currentTimeMillis()), "ds1");
     }
 
-    void shouldShardingShardedId(OvelinDsComplexShardingAlgorithm ovelinDsComplexShardingAlgorithm, Collection<String> availableTargetDsNames, ShardedId shardedId, String ds) {
-        HashMap<String, Collection<Comparable<?>>> columnNameAndShardingValuesMap = new HashMap<>();
-        columnNameAndShardingValuesMap.put("shard_id", new HashSet<>(List.of(shardedId.value())));
-        Map<String, Range<Comparable<?>>> columnNameAndRangeValuesMap = new HashMap<>();
-        ComplexKeysShardingValue<Comparable<?>> shardingValue = new ComplexKeysShardingValue<>("table", columnNameAndShardingValuesMap, columnNameAndRangeValuesMap);
-        Collection<String> resultDsNames = ovelinDsComplexShardingAlgorithm.doSharding(availableTargetDsNames, shardingValue);
-        assertEquals(Set.of(ds), resultDsNames);
+
+    @Test
+    void shouldShardingStringKeyConfig_2_2(){
+        List<SequenceShardKeyResolver.ShardKeyRecord> shardKeys = SequenceShardKeyResolver.getSequenceShardKeys(4);
+        shouldShardingStringKey(shardKeys.get(0), ALGORITHM_2_2, CONFIG_2_2, "ds0");
+        shouldShardingStringKey(shardKeys.get(1), ALGORITHM_2_2, CONFIG_2_2, "ds0");
+        shouldShardingStringKey(shardKeys.get(2), ALGORITHM_2_2, CONFIG_2_2, "ds1");
+        shouldShardingStringKey(shardKeys.get(3), ALGORITHM_2_2, CONFIG_2_2, "ds1");
+    }
+    @Test
+    void shouldShardingStringKeyConfig_4_2(){
+        List<SequenceShardKeyResolver.ShardKeyRecord> shardKeys = SequenceShardKeyResolver.getSequenceShardKeys(8);
+        shouldShardingStringKey(shardKeys.get(0), ALGORITHM_4_2, CONFIG_4_2, "ds0");
+        shouldShardingStringKey(shardKeys.get(1), ALGORITHM_4_2, CONFIG_4_2, "ds0");
+        shouldShardingStringKey(shardKeys.get(2), ALGORITHM_4_2, CONFIG_4_2, "ds1");
+        shouldShardingStringKey(shardKeys.get(3), ALGORITHM_4_2, CONFIG_4_2, "ds1");
+        shouldShardingStringKey(shardKeys.get(4), ALGORITHM_4_2, CONFIG_4_2, "ds2");
+        shouldShardingStringKey(shardKeys.get(5), ALGORITHM_4_2, CONFIG_4_2, "ds2");
+        shouldShardingStringKey(shardKeys.get(6), ALGORITHM_4_2, CONFIG_4_2, "ds3");
+        shouldShardingStringKey(shardKeys.get(7), ALGORITHM_4_2, CONFIG_4_2, "ds3");
+    }
+
+    @Test
+    void shouldShardingStringFieldConfig_4_4(){
+        List<SequenceShardKeyResolver.ShardKeyRecord> shardKeys = SequenceShardKeyResolver.getSequenceShardKeys(16);
+        shouldShardingStringKey(shardKeys.get(0), ALGORITHM_4_4, CONFIG_4_4, "ds0");
+        shouldShardingStringKey(shardKeys.get(1), ALGORITHM_4_4, CONFIG_4_4, "ds0");
+        shouldShardingStringKey(shardKeys.get(2), ALGORITHM_4_4, CONFIG_4_4, "ds0");
+        shouldShardingStringKey(shardKeys.get(3), ALGORITHM_4_4, CONFIG_4_4, "ds0");
+        shouldShardingStringKey(shardKeys.get(4), ALGORITHM_4_4, CONFIG_4_4, "ds1");
+        shouldShardingStringKey(shardKeys.get(5), ALGORITHM_4_4, CONFIG_4_4, "ds1");
+        shouldShardingStringKey(shardKeys.get(6), ALGORITHM_4_4, CONFIG_4_4, "ds1");
+        shouldShardingStringKey(shardKeys.get(7), ALGORITHM_4_4, CONFIG_4_4, "ds1");
+    }
+
+    void shouldShardingStringKey(SequenceShardKeyResolver.ShardKeyRecord shardKey, OvelinDsComplexShardingAlgorithm ovelinDsComplexShardingAlgorithm, Config config, String ds) {
+        super.shouldShardingStringKey(shardKey, ovelinDsComplexShardingAlgorithm, config.dsNames(), ds);
+    }
+
+    void shouldShardingShardedId(OvelinDsComplexShardingAlgorithm ovelinDsComplexShardingAlgorithm, Config config, ShardedId shardedId, String shardingKey, String ds) {
+        super.shouldShardingShardedId(ovelinDsComplexShardingAlgorithm, config.dsNames(), shardedId, shardingKey, ds);
+    }
+
+    void shouldShardingShardedId(OvelinDsComplexShardingAlgorithm ovelinDsComplexShardingAlgorithm, Config config, String shardingKey, String ds) {
+        super.shouldShardingShardedId(ovelinDsComplexShardingAlgorithm, config.dsNames(), shardingKey, ds);
+    }
+
+    void shouldShardingShardedId(OvelinDsComplexShardingAlgorithm ovelinDsComplexShardingAlgorithm, Config config, ShardedId shardedId, String ds) {
+        super.shouldShardingShardedId(ovelinDsComplexShardingAlgorithm, config.dsNames(), shardedId, ds);
     }
 }

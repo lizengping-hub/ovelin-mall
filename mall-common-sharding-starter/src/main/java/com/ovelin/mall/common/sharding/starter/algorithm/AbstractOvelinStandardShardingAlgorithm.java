@@ -1,12 +1,10 @@
 package com.ovelin.mall.common.sharding.starter.algorithm;
 
-import com.ovelin.mall.common.sharding.core.ov.ShardedId;
 import org.apache.shardingsphere.sharding.api.sharding.standard.PreciseShardingValue;
 import org.apache.shardingsphere.sharding.api.sharding.standard.RangeShardingValue;
 import org.apache.shardingsphere.sharding.api.sharding.standard.StandardShardingAlgorithm;
 
 import java.util.Collection;
-import java.util.Properties;
 
 abstract class AbstractOvelinStandardShardingAlgorithm extends AbstractOvelinShardingAlgorithm<Comparable<?>> implements StandardShardingAlgorithm<Comparable<?>> {
 
@@ -14,8 +12,8 @@ abstract class AbstractOvelinStandardShardingAlgorithm extends AbstractOvelinSha
     @Override
     public String doSharding(Collection<String> availableTargetNames, PreciseShardingValue<Comparable<?>> shardingValue) {;
         Comparable<?> shardedId = shardingValue.getValue();
-        long tableIndex = doSharding(shardedId);
-        String tableIndexStr = String.valueOf(tableIndex);
+        int resolvedIndex = resolveIndex(shardedId);
+        String tableIndexStr = String.valueOf(resolvedIndex);
         for (String target : availableTargetNames) {
             if (target.endsWith(tableIndexStr)) {
                 return target;

@@ -1,4 +1,4 @@
-name: mall
+name: mall-dev
 
 services:
   mysql-instance-0:
@@ -12,6 +12,12 @@ services:
     volumes:
       - mall-mysql-instance-0-dev:/var/lib/mysql
       - ./mysql/init:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: [ "CMD-SHELL", "mysqladmin ping -h 127.0.0.1 -uroot -p$$MYSQL_ROOT_PASSWORD" ]
+      interval: 2s
+      timeout: 3s
+      retries: 60
+      start_period: 30s
   mysql-instance-1:
     image: mysql:8.4
     container_name: mall-mysql-instance-1-dev
@@ -23,6 +29,12 @@ services:
     volumes:
       - mall-mysql-instance-1-dev:/var/lib/mysql
       - ./mysql/init:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: [ "CMD-SHELL", "mysqladmin ping -h 127.0.0.1 -uroot -p$$MYSQL_ROOT_PASSWORD" ]
+      interval: 2s
+      timeout: 3s
+      retries: 60
+      start_period: 30s
 
 volumes:
   mall-mysql-instance-0-dev:
