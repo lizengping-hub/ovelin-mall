@@ -1,28 +1,22 @@
-package com.ovelin.mall.common.sharding.starter.algorithm;
+package com.ovelin.mall.common.sharding.core.core;
 
+import com.ovelin.mall.common.sharding.core.api.ShardResolver;
 import com.ovelin.mall.common.sharding.core.ov.ShardId;
 
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 
-public class ShardCalculator {
+public class HashShardResolver implements ShardResolver {
 
-    public static long shardingDsIndex(long id, long dsCount, long tableCount) {
-        return (id % (dsCount * tableCount) / tableCount);
-    }
-
-    public static long shardingTableIndex(long id, long dsCount, long tableCount) {
-        return id % (dsCount * tableCount) % tableCount;
-    }
-
-    public static int shardIdFor(Object shardKey) {
-        byte[] hash = sha256(shardKey.toString());
+    @Override
+    public ShardId resolve(String shardKey) {
+        byte[] hash = sha256(shardKey);
         long unsignedPrefix = ((long) (hash[0] & 0xff) << 24)
                 | ((long) (hash[1] & 0xff) << 16)
                 | ((long) (hash[2] & 0xff) << 8)
                 | (hash[3] & 0xffL);
-        return (int) (unsignedPrefix % ShardId.SHARD_CAPACITY);
+        return ShardId.of((int)(unsignedPrefix % ShardId.SHARD_CAPACITY));
     }
 
     private static byte[] sha256(String shardKey) {

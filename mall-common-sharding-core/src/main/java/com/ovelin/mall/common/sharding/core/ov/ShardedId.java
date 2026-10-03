@@ -13,14 +13,14 @@ public final class ShardedId implements Identifier {
 
     public static ShardedId of(ShardId shard, long sequence) {
         IdLayout.validateSequence(sequence);
-        return new ShardedId((sequence << IdLayout.SHARD_BITS) | shard.value());
+        return new ShardedId(((long) shard.value() << IdLayout.SEQUENCE_BITS) | sequence);
     }
     public static ShardedId of(int shard, long sequence) {
         return of(ShardId.of(shard), sequence);
     }
     public static int shardOf(long id) {
         requireNonNegative(id);
-        return (int) (id & IdLayout.MAX_SHARD);
+        return (int) (id >> IdLayout.SEQUENCE_BITS);
     }
 
     private static void requireNonNegative(long id) {
@@ -29,8 +29,8 @@ public final class ShardedId implements Identifier {
         }
     }
 
-    public ShardId shardId() { return new ShardId((int) (id & IdLayout.MAX_SHARD)); }
-    public long sequence()   { return id >> IdLayout.SHARD_BITS; }
+    public ShardId shardId() { return new ShardId(shardOf(id)); }
+    public long sequence()   { return id & IdLayout.MAX_SEQUENCE; }
     public long value()      { return id; }
     @Override
     public int hashCode() { return Long.hashCode(id); }
