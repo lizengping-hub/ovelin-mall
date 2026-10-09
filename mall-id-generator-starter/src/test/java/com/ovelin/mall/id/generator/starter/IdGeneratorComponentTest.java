@@ -3,7 +3,6 @@ package com.ovelin.mall.id.generator.starter;
 import com.ovelin.mall.common.sharding.core.api.ShardSelector;
 import com.ovelin.mall.common.sharding.core.ov.ShardId;
 import com.ovelin.mall.common.sharding.core.ov.ShardedId;
-import com.ovelin.mall.id.generator.api.IdDTO;
 import com.ovelin.mall.id.generator.api.IdGenerationCommand;
 import com.ovelin.mall.id.generator.api.IdGenerator;
 import com.ovelin.mall.id.generator.starter.infrastructure.autoconfigure.IdGeneratorProperties;
@@ -52,16 +51,16 @@ class IdGeneratorComponentTest {
 
     @Test
     void shouldUseResolverShardWhenNotSpecified() {
-        IdDTO id = idGenerator.nextId(IdGenerationCommand.builder("order").build());
+        ShardedId id = idGenerator.nextId(IdGenerationCommand.builder("order").build());
 
-        assertEquals(DEFAULT_SHARD.value(), ShardedId.shardOf(id.id()));
+        assertEquals(DEFAULT_SHARD, id.shardId());
     }
 
     @Test
     void shouldUseSpecifiedShard() {
-        IdDTO id = idGenerator.nextId(IdGenerationCommand.builder("order").shardId(9).build());
+        ShardedId id = idGenerator.nextId(IdGenerationCommand.builder("order").shardId(9).build());
 
-        assertEquals(9, ShardedId.shardOf(id.id()));
+        assertEquals(9, id.shardId().value());
     }
 
     @Test
@@ -69,8 +68,8 @@ class IdGeneratorComponentTest {
         long prev = -1;
         IdGenerationCommand command = IdGenerationCommand.builder("order").shardId(1).build();
         for (int i = 0; i < 350; i++) { // 容量 100,跨多个段
-            IdDTO id = idGenerator.nextId(command);
-            long seq = ShardedId.fromId(id.id()).sequence();
+            ShardedId id = idGenerator.nextId(command);
+            long seq = id.sequence();
             assertEquals(seq, prev + 1);
             prev = seq;
         }
@@ -78,14 +77,14 @@ class IdGeneratorComponentTest {
 
     @Test
     void nextIdsShouldReturnRequestedCountInOneShardWithUniqueIds() {
-        List<IdDTO> ids = idGenerator.nextIds(
+        List<ShardedId> ids = idGenerator.nextIds(
                 IdGenerationCommand.builder("order").shardId(2).count(250).build());
 
         assertEquals(250, ids.size());
         Set<Long> unique = new HashSet<>();
-        for (IdDTO dto : ids) {
-            assertEquals(2, ShardedId.shardOf(dto.id()));
-            assertTrue(unique.add(dto.id()));
+        for (ShardedId id : ids) {
+            assertEquals(2, id.shardId().value());
+            assertTrue(unique.add(id.value()));
         }
     }
 
@@ -109,7 +108,7 @@ class IdGeneratorComponentTest {
                 futures.add(pool.submit(() -> {
                     start.await();
                     for (int i = 0; i < perTask; i++) {
-                        ids.add(idGenerator.nextId(IdGenerationCommand.builder("order").build()).id());
+                        ids.add(idGenerator.nextId(IdGenerationCommand.builder("order").build()).value());
                     }
                     return null;
                 }));

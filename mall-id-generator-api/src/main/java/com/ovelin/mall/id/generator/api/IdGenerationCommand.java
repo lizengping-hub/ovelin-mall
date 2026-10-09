@@ -58,8 +58,13 @@ public final class IdGenerationCommand {
         }
 
         /** Raw shard number from the interface layer; null means unspecified. Range is validated by {@link ShardId}. */
-        public Builder shardId(Integer shardId) {
-            this.shardId = shardId == null ? null : ShardId.of(shardId);
+        public Builder shardId(ShardId shardId) {
+            this.shardId = shardId;
+            return this;
+        }
+        /** Raw shard number from the interface layer; null means unspecified. Range is validated by {@link ShardId}. */
+        public Builder shardId(int shardId) {
+            this.shardId = ShardId.of(shardId);
             return this;
         }
 

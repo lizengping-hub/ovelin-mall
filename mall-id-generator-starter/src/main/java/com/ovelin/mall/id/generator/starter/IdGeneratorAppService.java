@@ -3,7 +3,6 @@ package com.ovelin.mall.id.generator.starter;
 import com.ovelin.mall.common.sharding.core.ov.ShardId;
 import com.ovelin.mall.common.sharding.core.ov.ShardedId;
 import com.ovelin.mall.id.generator.api.IdGenerationCommand;
-import com.ovelin.mall.id.generator.api.IdDTO;
 import com.ovelin.mall.id.generator.api.IdGenerator;
 import com.ovelin.mall.id.generator.starter.domain.module.valueobject.SequenceName;
 import com.ovelin.mall.id.generator.starter.domain.service.IdGeneratorDomainService;
@@ -19,18 +18,17 @@ public class IdGeneratorAppService implements IdGenerator {
     }
 
     @Override
-    public List<IdDTO> nextIds(IdGenerationCommand command) {
+    public List<ShardedId> nextIds(IdGenerationCommand command) {
         ShardId shardId = command.shardId().orElse(null);
         SequenceName sequenceName = IdAssembler.toSequenceName(command.businessType());
         List<ShardedId> sharedIds = idGeneratorDomainService.nextIds(sequenceName, shardId, command.count());
-        return sharedIds.stream().map(IdAssembler::toIdDTO).toList();
+        return sharedIds.stream().toList();
     }
 
     @Override
-    public IdDTO nextId(IdGenerationCommand command) {
+    public ShardedId nextId(IdGenerationCommand command) {
         SequenceName sequenceName = IdAssembler.toSequenceName(command.businessType());
         ShardId shardId = command.shardId().orElse(null);
-        ShardedId sharedId = idGeneratorDomainService.nextId(sequenceName, shardId);
-        return IdAssembler.toIdDTO(sharedId);
+        return idGeneratorDomainService.nextId(sequenceName, shardId);
     }
 }

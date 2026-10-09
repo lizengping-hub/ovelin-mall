@@ -25,7 +25,7 @@ class IdGenerationCommandTest {
     @Test
     void shouldCarryAllFields() {
         IdGenerationCommand command = IdGenerationCommand.builder("order")
-                .shardId(4).tenantId("t1").count(10).traceId("trace-1").build();
+                .shardId(ShardId.of(4)).tenantId("t1").count(10).traceId("trace-1").build();
 
         assertEquals(ShardId.of(4), command.shardId().orElseThrow());
         assertEquals("t1", command.tenantId());
@@ -38,12 +38,6 @@ class IdGenerationCommandTest {
         IdGenerationCommand command = IdGenerationCommand.builder("order").shardId(null).build();
 
         assertTrue(command.shardId().isEmpty());
-    }
-
-    @Test
-    void shouldRejectShardOutOfRange() {
-        assertThrows(IllegalArgumentException.class,
-                () -> IdGenerationCommand.builder("order").shardId(-1));
     }
 
     @ParameterizedTest

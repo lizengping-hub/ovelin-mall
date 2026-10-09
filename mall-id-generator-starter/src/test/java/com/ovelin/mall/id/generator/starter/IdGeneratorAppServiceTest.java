@@ -2,7 +2,6 @@ package com.ovelin.mall.id.generator.starter;
 
 import com.ovelin.mall.common.sharding.core.ov.ShardId;
 import com.ovelin.mall.common.sharding.core.ov.ShardedId;
-import com.ovelin.mall.id.generator.api.IdDTO;
 import com.ovelin.mall.id.generator.api.IdGenerationCommand;
 import com.ovelin.mall.id.generator.starter.domain.module.valueobject.SequenceName;
 import com.ovelin.mall.id.generator.starter.domain.service.IdGeneratorDomainService;
@@ -38,9 +37,9 @@ class IdGeneratorAppServiceTest {
         ShardedId sharded = ShardedId.of(3, 42L);
         when(domainService.nextId(any(SequenceName.class), isNull())).thenReturn(sharded);
 
-        IdDTO dto = appService.nextId(IdGenerationCommand.builder("order").build());
+        ShardedId id = appService.nextId(IdGenerationCommand.builder("order").build());
 
-        assertEquals(sharded.value(), dto.id()); // TODO: 若 IdAssembler 还映射了其他字段,在这里补充断言
+        assertEquals(sharded, id); // TODO: 若 IdAssembler 还映射了其他字段,在这里补充断言
         verify(domainService).nextId(any(SequenceName.class), isNull());
         verifyNoMoreInteractions(domainService);
     }
@@ -50,9 +49,9 @@ class IdGeneratorAppServiceTest {
         when(domainService.nextId(any(SequenceName.class), eq(ShardId.of(5))))
                 .thenReturn(ShardedId.of(5, 1L));
 
-        IdDTO dto = appService.nextId(IdGenerationCommand.builder("order").shardId(5).build());
+        ShardedId id = appService.nextId(IdGenerationCommand.builder("order").shardId(5).build());
 
-        assertEquals(5, ShardedId.shardOf(dto.id()));
+        assertEquals(5, id.shardId().value());
     }
 
     @Test
@@ -73,12 +72,12 @@ class IdGeneratorAppServiceTest {
         when(domainService.nextIds(any(SequenceName.class), eq(ShardId.of(2)), eq(3)))
                 .thenReturn(List.of(ShardedId.of(2, 1L), ShardedId.of(2, 2L), ShardedId.of(2, 3L)));
 
-        List<IdDTO> dtos = appService.nextIds(
+        List<ShardedId> ids = appService.nextIds(
                 IdGenerationCommand.builder("order").shardId(2).count(3).build());
 
-        assertEquals(3, dtos.size());
+        assertEquals(3, ids.size());
         assertEquals(List.of(1L, 2L, 3L),
-                dtos.stream().map(d -> ShardedId.fromId(d.id()).sequence()).toList());
+                ids.stream().map(ShardedId::sequence).toList());
     }
 
     @Test
@@ -86,9 +85,9 @@ class IdGeneratorAppServiceTest {
         when(domainService.nextIds(any(SequenceName.class), isNull(), eq(2)))
                 .thenReturn(List.of(ShardedId.of(1, 1L), ShardedId.of(1, 2L)));
 
-        List<IdDTO> dtos = appService.nextIds(IdGenerationCommand.builder("order").count(2).build());
+        List<ShardedId> ids = appService.nextIds(IdGenerationCommand.builder("order").count(2).build());
 
-        assertEquals(2, dtos.size());
+        assertEquals(2, ids.size());
     }
 
     @Test
