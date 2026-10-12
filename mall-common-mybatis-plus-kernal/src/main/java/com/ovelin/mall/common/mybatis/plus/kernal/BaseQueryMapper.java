@@ -1,30 +1,23 @@
 package com.ovelin.mall.common.mybatis.plus.kernal;
 
 import com.baomidou.mybatisplus.core.batch.BatchSqlSession;
-import com.baomidou.mybatisplus.core.batch.MybatisBatch;
 import com.baomidou.mybatisplus.core.conditions.Wrapper;
-import com.baomidou.mybatisplus.core.enums.SqlMethod;
 import com.baomidou.mybatisplus.core.mapper.BaseMapper;
-import com.baomidou.mybatisplus.core.metadata.MapperProxyMetadata;
-import com.baomidou.mybatisplus.core.metadata.TableInfo;
-import com.baomidou.mybatisplus.core.metadata.TableInfoHelper;
 import com.baomidou.mybatisplus.core.toolkit.*;
 import org.apache.ibatis.annotations.Param;
 import org.apache.ibatis.executor.BatchResult;
-import org.apache.ibatis.session.SqlSessionFactory;
 
 import java.io.Serializable;
 import java.util.Collection;
 import java.util.List;
 import java.util.Map;
-import java.util.Objects;
 import java.util.function.BiPredicate;
 
 /**
  * DDD 查询通道专属：只读 Mapper 基类
  * 继承自 MyBatis-Plus BaseMapper，利用多态和默认方法彻底封死写入操作
  */
-public interface ReadOnlyMapper<T> extends BaseMapper<T> {
+public interface BaseQueryMapper<T> extends BaseMapper<T> {
 
     // ==========================================
     // ❌ 彻底禁用所有写入、更新方法 (打上废弃标签并抛出异常)
