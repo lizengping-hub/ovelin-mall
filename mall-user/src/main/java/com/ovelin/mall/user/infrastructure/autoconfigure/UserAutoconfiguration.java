@@ -1,6 +1,5 @@
 package com.ovelin.mall.user.infrastructure.autoconfigure;
 
-import com.ovelin.mall.id.generator.api.IdGenerator;
 import com.ovelin.mall.user.api.UserApi;
 import com.ovelin.mall.user.api.UserQueryService;
 import com.ovelin.mall.user.application.api.UserApiImpl;
@@ -33,8 +32,8 @@ public class UserAutoconfiguration {
     }
     @Bean
     @ConditionalOnMissingBean
-    UserApi userApi(UserRepository userRepository, IdGenerator idGenerator) {
-        return new UserApiImpl(userRepository, idGenerator);
+    UserApi userApi(UserRepository userRepository) {
+        return new UserApiImpl(userRepository);
     }
 
 }

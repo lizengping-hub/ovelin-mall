@@ -34,11 +34,13 @@ public class UserAssembler {
         return userDTO;
     }
 
-    /** Command -> 新用户。手机/邮箱由认证模块处理，这里只管资料。 */
-    public static User toUser(CreateUserCommand cmd, ShardedId id) {
+
+    public static User toUser(CreateUserCommand cmd) {
         Objects.requireNonNull(cmd, "CreateUserCommand cannot be null");
+        Objects.requireNonNull(cmd.getShardedId(), "CreateUserCommand.shardedId must not be null");
         Optional<Birthday> birthdayOptional = Birthday.ofNullable(cmd.getBirthYear(), cmd.getBirthMonth(), cmd.getBirthDay());
-        User user = User.register(id,
+        User user = User.register(
+                cmd.getShardedId(),
                 DisplayName.from(cmd.getDisplayName()),
                 RegisterSource.fromCode(cmd.getRegisterSource()));
 

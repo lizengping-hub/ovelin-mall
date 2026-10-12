@@ -35,10 +35,10 @@ public class User implements ShardedAggregateRoot<ShardedId> {
     private Instant deregisteredAt;
 
     private User(ShardedId id, DisplayName displayName, RegisterSource registerSource, UserStatus status) {
-        this.id = Objects.requireNonNull(id, "id must not be null");
-        this.displayName = Objects.requireNonNull(displayName, "displayName must not be null");
-        this.registerSource = Objects.requireNonNull(registerSource, "registerSource must not be null");
-        this.status = Objects.requireNonNull(status, "status must not be null");
+        this.id = Objects.requireNonNull(id, "User id must not be null");
+        this.displayName = Objects.requireNonNull(displayName, "User displayName must not be null");
+        this.registerSource = Objects.requireNonNull(registerSource, "User registerSource must not be null");
+        this.status = Objects.requireNonNull(status, "User status must not be null");
     }
 
     /** 业务入口：新注册用户。 */

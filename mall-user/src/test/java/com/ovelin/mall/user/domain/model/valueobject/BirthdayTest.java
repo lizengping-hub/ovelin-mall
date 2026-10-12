@@ -1,5 +1,6 @@
 package com.ovelin.mall.user.domain.model.valueobject;
 
+import com.ovelin.mall.user.domain.exception.InvalidArgumentException;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
@@ -34,7 +35,7 @@ class BirthdayTest {
         @Test
         void rejectsNullDate() {
             assertThatThrownBy(() -> Birthday.from(null))
-                    .isInstanceOf(IllegalArgumentException.class)
+                    .isInstanceOf(InvalidArgumentException.class)
                     .hasMessageContaining("must not be null");
         }
 
@@ -43,7 +44,7 @@ class BirthdayTest {
             LocalDate tomorrow = LocalDate.now().plusDays(2); // +2 避免跨时区/跨零点的边界抖动
 
             assertThatThrownBy(() -> Birthday.from(tomorrow))
-                    .isInstanceOf(IllegalArgumentException.class)
+                    .isInstanceOf(InvalidArgumentException.class)
                     .hasMessageContaining("future");
         }
 
@@ -64,7 +65,7 @@ class BirthdayTest {
 
             assertThatCode(() -> Birthday.from(kiritimatiToday, earliest)).doesNotThrowAnyException();
             assertThatThrownBy(() -> Birthday.from(kiritimatiToday, latest))
-                    .isInstanceOf(IllegalArgumentException.class);
+                    .isInstanceOf(InvalidArgumentException.class);
         }
     }
 
@@ -91,9 +92,8 @@ class BirthdayTest {
         @CsvSource({"0,1", "13,1", "1,0", "1,32", "2,30", "4,31", "6,31", "-1,10"})
         void rejectsInvalidMonthDay(int month, int day) {
             assertThatThrownBy(() -> Birthday.ofMonthDay(month, day))
-                    .isInstanceOf(IllegalArgumentException.class)
-                    .hasMessageContaining("invalid birthday")
-                    .hasCauseInstanceOf(java.time.DateTimeException.class);
+                    .isInstanceOf(InvalidArgumentException.class)
+                    .hasMessageContaining("invalid birthday");
         }
     }
 
@@ -124,7 +124,7 @@ class BirthdayTest {
         @Test
         void rejectsYearBeforeMin() {
             assertThatThrownBy(() -> Birthday.of(1899, 12, 31))
-                    .isInstanceOf(IllegalArgumentException.class)
+                    .isInstanceOf(InvalidArgumentException.class)
                     .hasMessageContaining("too early");
         }
 
@@ -137,18 +137,18 @@ class BirthdayTest {
         @Test
         void rejectsFeb29InNonLeapYear() {
             assertThatThrownBy(() -> Birthday.of(2023, 2, 29))
-                    .isInstanceOf(IllegalArgumentException.class)
+                    .isInstanceOf(InvalidArgumentException.class)
                     .hasMessageContaining("invalid birthday");
             assertThatThrownBy(() -> Birthday.of(1900, 2, 29)) // 1900 不是闰年
-                    .isInstanceOf(IllegalArgumentException.class);
+                    .isInstanceOf(InvalidArgumentException.class);
         }
 
         @Test
         void rejectsInvalidMonthDayWithYear() {
             assertThatThrownBy(() -> Birthday.of(1990, 13, 1))
-                    .isInstanceOf(IllegalArgumentException.class);
+                    .isInstanceOf(InvalidArgumentException.class);
             assertThatThrownBy(() -> Birthday.of(null, 2, 30))
-                    .isInstanceOf(IllegalArgumentException.class);
+                    .isInstanceOf(InvalidArgumentException.class);
         }
     }
 

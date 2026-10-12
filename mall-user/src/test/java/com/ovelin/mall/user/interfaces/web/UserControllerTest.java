@@ -35,9 +35,12 @@ class UserControllerTest {
 
     private static final long ID = 123456789L;
 
-    @Autowired MockMvc mockMvc;
-    @MockitoBean UserApplicationService userApplicationService;
-    @MockitoBean UserQueryService userQueryService;
+    @Autowired
+    MockMvc mockMvc;
+    @MockitoBean
+    UserApplicationService userApplicationService;
+    @MockitoBean
+    UserQueryService userQueryService;
 
     private static String json(String s) {
         return s.replace('\'', '"');   // 测试里用单引号写 JSON，省去转义
@@ -228,7 +231,8 @@ class UserControllerTest {
             mockMvc.perform(put("/users/{id}/gender", ID)
                             .contentType(MediaType.APPLICATION_JSON)
                             .content(json("{'gender':99}")))
-                    .andExpect(status().isBadRequest());
+                    .andExpect(status().isBadRequest())
+                    .andExpect(jsonPath("$.detail").value("unknown gender"));
         }
     }
 
@@ -251,13 +255,15 @@ class UserControllerTest {
                     .when(userApplicationService).deregister(eq(ID), any());
 
             mockMvc.perform(post("/users/{id}/deregister", ID))
-                    .andExpect(status().isNotFound());
+                    .andExpect(status().isNotFound())
+                    .andExpect(jsonPath("$.detail").value(ErrorCode.USER_NOT_FOUND.clientMessage()));
         }
 
         @Test
         void shouldRejectWrongHttpMethod() throws Exception {
             mockMvc.perform(get("/users/{id}/deregister", ID))
-                    .andExpect(status().isMethodNotAllowed());
+                    .andExpect(status().isMethodNotAllowed())
+            ;
         }
     }
 }

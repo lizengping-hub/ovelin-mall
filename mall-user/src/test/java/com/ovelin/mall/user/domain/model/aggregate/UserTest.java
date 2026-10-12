@@ -61,11 +61,11 @@ class UserTest {
         @DisplayName("必填项为 null 时抛出 NPE")
         void requiredFieldsMustNotBeNull() {
             assertThatThrownBy(() -> User.register(null, name, source))
-                    .isInstanceOf(NullPointerException.class).hasMessage("id must not be null");
+                    .isInstanceOf(NullPointerException.class).hasMessage("User id must not be null");
             assertThatThrownBy(() -> User.register(id, null, source))
-                    .isInstanceOf(NullPointerException.class).hasMessage("displayName must not be null");
+                    .isInstanceOf(NullPointerException.class).hasMessage("User displayName must not be null");
             assertThatThrownBy(() -> User.register(id, name, null))
-                    .isInstanceOf(NullPointerException.class).hasMessage("registerSource must not be null");
+                    .isInstanceOf(NullPointerException.class).hasMessage("User registerSource must not be null");
         }
     }
 

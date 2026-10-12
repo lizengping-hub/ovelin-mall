@@ -1,11 +1,12 @@
 package com.ovelin.mall.user.api;
 
 import com.ovelin.mall.common.sharding.core.ov.ShardId;
+import com.ovelin.mall.common.sharding.core.ov.ShardedId;
 import lombok.Getter;
 
 @Getter
 public final class CreateUserCommand {
-    private final ShardId shardId;
+    private final ShardedId shardedId;
     private final String displayName;
     private final String registerSource;
     private final String avatarUrl;
@@ -18,7 +19,7 @@ public final class CreateUserCommand {
     private final Integer birthDay;
 
     private CreateUserCommand(Builder b){
-        this.shardId = b.shardId;
+        this.shardedId = b.shardedId;
         this.displayName = b.displayName;
         this.registerSource = b.registerSource;
         this.avatarUrl = b.avatarUrl;
@@ -27,11 +28,11 @@ public final class CreateUserCommand {
         this.birthMonth = b.birthMonth;
         this.birthDay = b.birthDay;
     }
-    public static Builder builder(String displayName, String registerSource){
-        return new Builder(displayName, registerSource);
+    public static Builder builder(ShardedId shardedId, String displayName, String registerSource){
+        return new Builder(shardedId, displayName, registerSource);
     }
     public static final class Builder{
-        private ShardId shardId;
+        private ShardedId shardedId;
         private final String displayName;
         private final String registerSource;
 
@@ -43,12 +44,13 @@ public final class CreateUserCommand {
         private Integer birthYear;
         private Integer birthMonth;
         private Integer birthDay;
-        public Builder(String displayName, String registerSource){
+        public Builder(ShardedId shardedId, String displayName, String registerSource){
+            this.shardedId = shardedId;
             this.displayName = displayName;
             this.registerSource = registerSource;
         }
-        public Builder shardId(ShardId shardId){
-            this.shardId = shardId;
+        public Builder shardId(ShardedId shardedId){
+            this.shardedId = shardedId;
             return this;
         }
         public Builder avatarUrl(String avatarUrl){

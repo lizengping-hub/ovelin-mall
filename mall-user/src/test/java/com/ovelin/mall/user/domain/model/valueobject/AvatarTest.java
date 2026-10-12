@@ -1,6 +1,7 @@
 package com.ovelin.mall.user.domain.model.valueobject;
 
 
+import com.ovelin.mall.user.domain.exception.InvalidArgumentException;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
@@ -69,7 +70,7 @@ class AvatarTest {
         @ValueSource(strings = {" ", "   "})
         void shouldRejectNullOrBlank(String url) {
             assertThatThrownBy(() -> Avatar.from(url))
-                    .isInstanceOf(IllegalArgumentException.class)
+                    .isInstanceOf(InvalidArgumentException.class)
                     .hasMessageContaining("cannot be null or blank");
         }
 
@@ -77,16 +78,15 @@ class AvatarTest {
         void shouldRejectTooLong() {
             String url = "https://a.com/" + "a".repeat(483) + ".png"; // 501
             assertThatThrownBy(() -> Avatar.from(url))
-                    .isInstanceOf(IllegalArgumentException.class)
+                    .isInstanceOf(InvalidArgumentException.class)
                     .hasMessageContaining("too long");
         }
 
         @Test
         void shouldRejectInvalidSyntax() {
             assertThatThrownBy(() -> Avatar.from("https://cdn.ovelin.com/a b.png"))
-                    .isInstanceOf(IllegalArgumentException.class)
-                    .hasMessageContaining("Invalid avatar url")
-                    .hasCauseInstanceOf(java.net.URISyntaxException.class);
+                    .isInstanceOf(InvalidArgumentException.class)
+                    .hasMessageContaining("Invalid avatar url");
         }
 
         @ParameterizedTest
@@ -99,14 +99,14 @@ class AvatarTest {
         })
         void shouldRejectNonHttpScheme(String url) {
             assertThatThrownBy(() -> Avatar.from(url))
-                    .isInstanceOf(IllegalArgumentException.class)
+                    .isInstanceOf(InvalidArgumentException.class)
                     .hasMessageContaining("must be http/https");
         }
 
         @Test
         void shouldRejectMissingHost() {
             assertThatThrownBy(() -> Avatar.from("https:///a.png"))
-                    .isInstanceOf(IllegalArgumentException.class)
+                    .isInstanceOf(InvalidArgumentException.class)
                     .hasMessageContaining("valid host");
         }
 
@@ -120,7 +120,7 @@ class AvatarTest {
         })
         void shouldRejectNonImageExtension(String url) {
             assertThatThrownBy(() -> Avatar.from(url))
-                    .isInstanceOf(IllegalArgumentException.class)
+                    .isInstanceOf(InvalidArgumentException.class)
                     .hasMessageContaining("must point to an image file");
         }
     }
@@ -133,7 +133,7 @@ class AvatarTest {
         @NullAndEmptySource
         @ValueSource(strings = {" ", "\t"})
         void shouldReturnNullForNullOrBlank(String url) {
-            assertThatThrownBy(()->Avatar.reconstitute(url)).isInstanceOf(IllegalArgumentException.class).hasMessageContaining("cannot be null or blank");
+            assertThatThrownBy(()->Avatar.reconstitute(url)).isInstanceOf(InvalidArgumentException.class).hasMessageContaining("cannot be null or blank");
         }
 
         @Test

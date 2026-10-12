@@ -56,10 +56,6 @@
         </dependency>
         <dependency>
             <groupId>com.ovelin</groupId>
-            <artifactId>mall-id-generator-starter</artifactId>
-        </dependency>
-        <dependency>
-            <groupId>com.ovelin</groupId>
             <artifactId>mall-common-mybatis-plus-kernal</artifactId>
         </dependency>
         <dependency>
