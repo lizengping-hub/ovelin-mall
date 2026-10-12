@@ -1,7 +1,7 @@
-package com.ovelin.mall.common.sharding.core.ov;
+package com.ovelin.mall.common.sharding.core.core;
 
 import com.ovelin.mall.common.sharding.core.api.DataSourceIndexResolver;
-import com.ovelin.mall.common.sharding.core.core.DataSourceIndexResolverImpl;
+import com.ovelin.mall.common.sharding.core.ov.ShardId;
 import org.junit.jupiter.api.Test;
 
 import static org.assertj.core.api.AssertionsForClassTypes.assertThat;

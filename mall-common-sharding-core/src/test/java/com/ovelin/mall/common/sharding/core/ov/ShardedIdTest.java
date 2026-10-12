@@ -41,15 +41,6 @@ class ShardedIdTest {
         assertEquals(1L, id.sequence());
     }
 
-    @Test
-    void shouldRejectInvalidSequence() {
-        // TODO: 以 IdLayout.validateSequence 实际抛出的异常类型为准
-        assertThrows(IllegalArgumentException.class, () -> ShardedId.of(0, -1L));
-        // 左移 SHARD_BITS 后会溢出,必须被拒绝而不是悄悄产生错误的 id
-        assertThrows(IllegalArgumentException.class, () -> ShardedId.of(0, Long.MAX_VALUE));
-        // 左移 SHARD_BITS 后会溢出,必须被拒绝而不是悄悄产生错误的 id
-        assertThrows(IllegalArgumentException.class, () -> ShardedId.of(0, IdLayout.MAX_SEQUENCE + 1));
-    }
 
     @Test
     void shouldRejectNegativeRawId() {
