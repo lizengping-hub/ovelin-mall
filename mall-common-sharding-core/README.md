@@ -15,7 +15,7 @@ shardingsphere-authority-simple                    # 默认权限实现
 ```asciidoc
 dataSources:
   ds0:
-    jdbcUrl: jdbc:mysql://127.0.0.1:3306/user_database?allowPublicKeyRetrieval=true&useSSL=false&serverTimezone=UTC
+    jdbcUrl: jdbc:mysql://127.0.0.1:3306/database?allowPublicKeyRetrieval=true&useSSL=false&serverTimezone=UTC
     dataSourceClassName: com.zaxxer.hikari.HikariDataSource
     driverClassName: com.mysql.cj.jdbc.Driver
     username: ovelin
