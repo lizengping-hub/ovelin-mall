@@ -40,11 +40,6 @@
             </dependency>
             <dependency>
                 <groupId>com.ovelin</groupId>
-                <artifactId>mall-common-valueobject</artifactId>
-                <version>${project.version}</version>
-            </dependency>
-            <dependency>
-                <groupId>com.ovelin</groupId>
                 <artifactId>mall-common-sharding-core</artifactId>
                 <version>${project.version}</version>
             </dependency>
@@ -160,7 +155,6 @@
         </plugins>
     </build>
     <modules>
-        <module>mall-common-valueobject</module>
         <module>mall-common-mybatis-plus-kernal</module>
         <module>mall-common-test-environment-support</module>
         <module>mall-common-web-starter</module>

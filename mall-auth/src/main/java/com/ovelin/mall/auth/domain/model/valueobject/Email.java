@@ -1,4 +1,4 @@
-package com.ovelin.mall.common.valueobject;
+package com.ovelin.mall.auth.domain.model.valueobject;
 
 
 import lombok.Getter;
