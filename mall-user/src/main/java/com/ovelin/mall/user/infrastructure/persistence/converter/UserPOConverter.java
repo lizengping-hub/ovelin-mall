@@ -20,7 +20,7 @@ public final class UserPOConverter {
     public static User toUser(UserPO po) {
         if (po == null) return null;
 
-        return User.reconstitute(new UserSnapshot(
+        return User.reconstitute(
                 ShardedId.fromId(po.getId()),
                 DisplayName.reconstitute(po.getDisplayName()),
                 RegisterSource.fromCode(po.getRegisterSource()),
@@ -31,7 +31,7 @@ public final class UserPOConverter {
                 po.getVersion(),
                 po.getCreatedAt(),
                 po.getUpdatedAt(),
-                po.getDeregisteredAt()));
+                po.getDeregisteredAt());
     }
 
     /** 聚合 -> PO。不写 createdAt / updatedAt。 */

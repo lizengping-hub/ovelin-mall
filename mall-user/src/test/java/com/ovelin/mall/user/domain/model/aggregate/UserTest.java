@@ -8,7 +8,6 @@ import com.ovelin.mall.user.domain.model.enums.RegisterSource;
 import com.ovelin.mall.user.domain.model.enums.UserStatus;
 import com.ovelin.mall.user.domain.model.valueobject.Avatar;
 import com.ovelin.mall.user.domain.model.valueobject.Birthday;
-import com.ovelin.mall.user.domain.model.valueobject.UserSnapshot;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
@@ -32,11 +31,19 @@ class UserTest {
     private final com.ovelin.mall.user.domain.model.valueobject.DisplayName name = com.ovelin.mall.user.domain.model.valueobject.DisplayName.from("Tom");
     private final RegisterSource source = RegisterSource.UNKNOWN;
 
-    /** 用 reconstitute 构造任意状态的用户，不依赖 setter。 */
+    /**
+     * 用 reconstitute 构造任意状态的用户，不依赖 setter。
+     */
     private User userWith(UserStatus status) {
-        return User.reconstitute(new UserSnapshot(
+        return User.reconstitute(
                 id, name, source, status,
-                mock(Avatar.class), Gender.UnKnown, mock(Birthday.class), 0L, null, null, null));
+                mock(Avatar.class),
+                Gender.UnKnown,
+                mock(Birthday.class),
+                0L,
+                null,
+                null,
+                null);
     }
 
     @Nested
@@ -76,8 +83,8 @@ class UserTest {
         @Test
         @DisplayName("gender 为空时回落为未知，其余字段原样还原")
         void genderFallsBackToUnknown() {
-            User user = User.reconstitute(new UserSnapshot(
-                    id, name, source, UserStatus.DISABLED, null, null, null, 0L, null, null, null));
+            User user = User.reconstitute(
+                    id, name, source, UserStatus.DISABLED, null, null, null, 0L, null, null, null);
 
             assertThat(user.getStatus()).isEqualTo(UserStatus.DISABLED);
             assertThat(user.getGender()).isEqualTo(Gender.UnKnown);
@@ -204,12 +211,15 @@ class UserTest {
     class Changes {
 
         record Op(String name, Consumer<User> action, Predicate<User> changed) {
-            @Override public String toString() { return name; }
+            @Override
+            public String toString() {
+                return name;
+            }
         }
 
         private static final com.ovelin.mall.user.domain.model.valueobject.DisplayName newName = com.ovelin.mall.user.domain.model.valueobject.DisplayName.from("Tom");
         private static final Avatar avatar = Avatar.from("https://example.com/default.png");
-        private static final Birthday birthday = Birthday.of(2000, 1,1);
+        private static final Birthday birthday = Birthday.of(2000, 1, 1);
 
         static Stream<Op> ops() {
             return Stream.of(

@@ -9,7 +9,6 @@ import com.ovelin.mall.user.domain.model.enums.RegisterSource;
 import com.ovelin.mall.user.domain.model.enums.UserStatus;
 import com.ovelin.mall.user.domain.model.valueobject.Avatar;
 import com.ovelin.mall.user.domain.model.valueobject.Birthday;
-import com.ovelin.mall.user.domain.model.valueobject.UserSnapshot;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 
@@ -27,9 +26,12 @@ public class UserAssemblerTest {
 
     /** 用 reconstitute 构造任意状态的用户，不依赖 setter。 */
     private User createUser() {
-        return User.reconstitute(new UserSnapshot(
+        return User.reconstitute(
                 id, name, source, UserStatus.ACTIVE,
-               null, null, null, 0L, Instant.now().truncatedTo(ChronoUnit.MILLIS), Instant.now().truncatedTo(ChronoUnit.MILLIS), null));
+               null, null, null, 0L,
+                Instant.now().truncatedTo(ChronoUnit.MILLIS),
+                Instant.now().truncatedTo(ChronoUnit.MILLIS),
+                null);
     }
     @Nested
     class ToDTO {

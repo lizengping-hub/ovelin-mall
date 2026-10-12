@@ -10,7 +10,6 @@ import com.ovelin.mall.user.domain.model.enums.UserStatus;
 import com.ovelin.mall.user.domain.model.valueobject.Avatar;
 import com.ovelin.mall.user.domain.model.valueobject.Birthday;
 import com.ovelin.mall.user.domain.model.valueobject.DisplayName;
-import com.ovelin.mall.user.domain.model.valueobject.UserSnapshot;
 import lombok.Getter;
 
 import java.time.Instant;
@@ -51,15 +50,26 @@ public class User implements ShardedAggregateRoot<ShardedId> {
     }
 
     /** 仅供 Repository / 持久化转换使用：按存储状态还原，不校验业务规则。 */
-    public static User reconstitute(UserSnapshot s) {
-        User user = new User(s.id(), s.displayName(), s.registerSource(), s.status());
-        user.avatar = s.avatar();
-        user.gender = s.gender() != null ? s.gender() : Gender.UnKnown;
-        user.birthday = s.birthday();
-        user.version = s.version();
-        user.createdAt = s.createdAt();
-        user.updatedAt = s.updatedAt();
-        user.deregisteredAt = s.deregisteredAt();
+    public static User reconstitute(
+            ShardedId id,
+            DisplayName displayName,
+            RegisterSource registerSource,
+            UserStatus status,
+            Avatar avatar,
+            Gender gender,
+            Birthday birthday,
+            Long version,
+            Instant createdAt,
+            Instant updatedAt,
+            Instant deregisteredAt)  {
+        User user = new User(id, displayName, registerSource, status);
+        user.avatar = avatar;
+        user.gender = gender != null ? gender : Gender.UnKnown;
+        user.birthday = birthday;
+        user.version = version;
+        user.createdAt = createdAt;
+        user.updatedAt = updatedAt;
+        user.deregisteredAt = deregisteredAt;
         return user;
     }
     /** 仅供仓储在持久化成功后调用，同步数据库中的新版本。 */
