@@ -20,7 +20,7 @@ BEGIN
                 '`status`             TINYINT      NOT NULL DEFAULT 1 COMMENT ''账号状态：1-正常，0-禁用，2-注销'',',
                 '`register_source`    VARCHAR(20)  NULL COMMENT ''注册来源：如 h5、app、wechat_mini 等'',',
                 '`deregistered_at`    TIMESTAMP(3)     NULL DEFAULT NULL COMMENT ''软删除时间，只做记录，状态由status过滤，管理'',',
-                ' version             BIGINT           NOT NULL DEFAULT 0 COMMENT ''版本控制'',',
+                ' version             BIGINT           NOT NULL COMMENT ''版本控制'',',
                 '`created_at`         TIMESTAMP(3)     NOT NULL DEFAULT CURRENT_TIMESTAMP(3) COMMENT ''创建时间'',',
                 '`updated_at`         TIMESTAMP(3)     NOT NULL DEFAULT CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3) COMMENT ''更新时间'',',
                 'PRIMARY KEY (id)',

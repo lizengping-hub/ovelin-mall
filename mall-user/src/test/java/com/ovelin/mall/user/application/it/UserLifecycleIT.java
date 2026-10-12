@@ -14,6 +14,7 @@ import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.http.MediaType;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.test.web.servlet.ResultActions;
 
 import static org.hamcrest.Matchers.instanceOf;
 import static org.hamcrest.Matchers.is;
@@ -126,8 +127,8 @@ class UserLifecycleIT {
     void deregister_thenQuery() throws Exception {
         Long id = createUser(ShardedId.of(1, 4),"alice");
 
-        mockMvc.perform(post("/users/{id}/deregister", id))
-                .andExpect(status().isNoContent());
+        ResultActions perform = mockMvc.perform(post("/users/{id}/deregister", id));
+                perform.andExpect(status().isNoContent());
 
         mockMvc.perform(get("/users/{id}", id))
                 .andExpect(status().isOk())

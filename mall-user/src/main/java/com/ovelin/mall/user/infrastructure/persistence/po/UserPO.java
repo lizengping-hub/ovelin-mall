@@ -46,7 +46,7 @@ public class UserPO {
     private String registerSource;
 
     @Version
-    private Long version;
+    private long version;
 
     /** 注销时间（业务时间），未注销为 null；普通列，随 status 一起写入 */
     @TableField(updateStrategy = FieldStrategy.ALWAYS)

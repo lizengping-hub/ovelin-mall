@@ -1,6 +1,7 @@
-package com.ovelin.mall.common.mybatis.plus.kernal;
+package com.ovelin.mall.common.mybatis.plus.kernal.baseQueryMapper;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.ovelin.mall.common.mybatis.plus.kernal.UserPO;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;

@@ -29,7 +29,7 @@ public class User implements ShardedAggregateRoot<ShardedId> {
     private Gender gender;
     private Birthday birthday;
     private UserStatus status;
-    private Long version;
+    private long version;
     private Instant createdAt;
     private Instant updatedAt;
     private Instant deregisteredAt;
@@ -45,7 +45,6 @@ public class User implements ShardedAggregateRoot<ShardedId> {
     public static User register(ShardedId id, DisplayName displayName, RegisterSource registerSource) {
         User user = new User(id, displayName, registerSource, UserStatus.ACTIVE);
         user.gender = Gender.UnKnown;
-        user.version = 0L;
         return user;
     }
 

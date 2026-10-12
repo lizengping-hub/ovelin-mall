@@ -1,6 +1,8 @@
 package com.ovelin.mall.user.infrastructure.persistence.repository;
 
-import com.ovelin.mall.common.mybatis.plus.kernal.OvelinMybatisPlusConfig;
+import com.ovelin.mall.common.mybatis.plus.kernal.OvelinMybatisPlusAutoConfiguration;
+import com.ovelin.mall.common.mybatis.plus.kernal.SqlCollectingInterceptor;
+import com.ovelin.mall.common.mybatis.plus.kernal.SqlTestConfiguration;
 import com.ovelin.mall.common.sharding.core.ov.ShardedId;
 import com.ovelin.mall.user.TestApplication;
 import com.ovelin.mall.user.domain.exception.ErrorCode;
@@ -28,7 +30,6 @@ import java.util.concurrent.atomic.AtomicLong;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
-import static org.assertj.core.api.InstanceOfAssertFactories.comparable;
 
 /**
  * UserRepository 集成测试：连接真实数据库，验证单元测试验证不了的部分——
@@ -37,9 +38,9 @@ import static org.assertj.core.api.InstanceOfAssertFactories.comparable;
  */
 // JUnit 的 @DisplayName 已 import，同名的值对象 DisplayName 只能写全限定名（见 name() 辅助方法）
 @SpringBootTest(classes = TestApplication.class)
-@Import(OvelinMybatisPlusConfig.class)
 @Transactional
 @DisplayName("UserRepository 集成测试")
+@Import(SqlTestConfiguration.class)
   class UserRepositoryImplIT {
 
     private static final String REGISTER_SOURCE = RegisterSource.ANDROID.code();
@@ -51,6 +52,9 @@ import static org.assertj.core.api.InstanceOfAssertFactories.comparable;
 
     @Autowired
     UserRepository userRepository;
+
+    @Autowired
+    SqlCollectingInterceptor sqlCollectingInterceptor;
 
     private static ShardedId nextId() {
         return ShardedId.fromId(SEQ.incrementAndGet());
@@ -206,11 +210,11 @@ import static org.assertj.core.api.InstanceOfAssertFactories.comparable;
         }
 
         @Test
-        @DisplayName("更新不存在的用户：不报错、也不会插入新行（现状；若改为抛异常需同步修改）")
+        @DisplayName("更新不存在的用户：抛出异常")
         void updateMissingUserIsSilent() {
             User ghost = newUser(nextId());
 
-            userRepository.update(ghost);
+            assertThatThrownBy(()->userRepository.update(ghost)).isInstanceOf(UserNotFoundException.class);
 
             assertThat(userRepository.findById(ghost.getId())).isNull();
         }
@@ -292,8 +296,10 @@ import static org.assertj.core.api.InstanceOfAssertFactories.comparable;
         void updateIncrementsVersion() {
             User user = saveNewUser();                         // add 后重新 findById，version = 0
             user.changeDisplayName(name("bob"));
-
+            sqlCollectingInterceptor.clear();
             userRepository.update(user);
+            assertThat(sqlCollectingInterceptor.getSqls().size()).isEqualTo(1);
+            assertThat(sqlCollectingInterceptor.getSqls().getFirst()).contains("AND version=?");
 
             assertThat(user.getVersion()).isEqualTo(1L);       // 回写到聚合
             User loaded = userRepository.findById(user.getId());
