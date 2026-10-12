@@ -31,5 +31,9 @@
             <groupId>com.ovelin</groupId>
             <artifactId>mall-id-generator-api</artifactId>
         </dependency>
+        <dependency>
+            <groupId>com.baomidou</groupId>
+            <artifactId>mybatis-plus-spring-boot4-starter</artifactId>
+        </dependency>
     </dependencies>
 </project>
