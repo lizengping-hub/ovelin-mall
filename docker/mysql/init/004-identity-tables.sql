@@ -1,4 +1,4 @@
-USE login_database;
+USE auth_database;
 
 DROP PROCEDURE IF EXISTS create_shard_tables;
 
@@ -9,7 +9,7 @@ BEGIN
     DECLARE shard_id INT DEFAULT 0;
     WHILE shard_id < 2 DO
         SET @statement_text = CONCAT(
-            'CREATE TABLE IF NOT EXISTS login_database.user_identity_', shard_id, ' (',
+            'CREATE TABLE IF NOT EXISTS auth_database.user_identity_', shard_id, ' (',
                 'id BIGINT NOT NULL COMMENT ''身份记录ID'',',
                 'user_id BIGINT NOT NULL COMMENT ''用户ID'',',
                 'identity_type VARCHAR(20) NOT NULL COMMENT ''username / phone / email'',',
@@ -33,7 +33,7 @@ BEGIN
         DEALLOCATE PREPARE create_login_table;
 
         SET @statement_text = CONCAT(
-                    'CREATE TABLE IF NOT EXISTS login_database.identity_lookup_', shard_id, ' (',
+                    'CREATE TABLE IF NOT EXISTS auth_database.identity_lookup_', shard_id, ' (',
                         'identity_type VARCHAR(20) NOT NULL COMMENT ''username / phone / email'',',
                         'identifier VARCHAR(255) NOT NULL COMMENT ''标准化登录标识'',',
                         'user_id BIGINT NOT NULL COMMENT ''用户ID'',',
@@ -49,7 +49,7 @@ BEGIN
         DEALLOCATE PREPARE create_login_table;
 
         SET @statement_text = CONCAT(
-                    'CREATE TABLE IF NOT EXISTS login_database.user_password_', shard_id, ' (',
+                    'CREATE TABLE IF NOT EXISTS auth_database.user_password_', shard_id, ' (',
                         'user_id BIGINT NOT NULL COMMENT ''用户ID'',',
                         'password_hash VARCHAR(255) NOT NULL COMMENT ''密码哈希'',',
                         'password_changed_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),',
@@ -69,7 +69,7 @@ BEGIN
         DEALLOCATE PREPARE create_login_table;
 
         SET @statement_text = CONCAT(
-                    'CREATE TABLE IF NOT EXISTS login_database.user_mfa_factor_', shard_id, ' (',
+                    'CREATE TABLE IF NOT EXISTS auth_database.user_mfa_factor_', shard_id, ' (',
                         'id BIGINT NOT NULL COMMENT ''二次验证因子ID'',',
                         'user_id BIGINT NOT NULL COMMENT ''用户ID'',',
                         'factor_type VARCHAR(20) NOT NULL COMMENT ''sms / email / totp / webauthn / recovery_code'',',

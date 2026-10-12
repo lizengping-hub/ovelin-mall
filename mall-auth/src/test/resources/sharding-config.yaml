@@ -1,25 +1,25 @@
 
 dataSources:
   user_ds0:
-    jdbcUrl: jdbc:mysql://127.0.0.1:3306/user_database?allowPublicKeyRetrieval=true&useSSL=false&serverTimezone=UTC
+    jdbcUrl: jdbc:mysql://127.0.0.1:3308/user_database?allowPublicKeyRetrieval=true&useSSL=false&serverTimezone=UTC
     dataSourceClassName: com.zaxxer.hikari.HikariDataSource
     driverClassName: com.mysql.cj.jdbc.Driver
     username: ovelin
     password: ovelin
   user_ds1:
-    jdbcUrl: jdbc:mysql://127.0.0.1:3307/user_database?allowPublicKeyRetrieval=true&useSSL=false&serverTimezone=UTC
+    jdbcUrl: jdbc:mysql://127.0.0.1:3309/user_database?allowPublicKeyRetrieval=true&useSSL=false&serverTimezone=UTC
     dataSourceClassName: com.zaxxer.hikari.HikariDataSource
     driverClassName: com.mysql.cj.jdbc.Driver
     username: ovelin
     password: ovelin
   identity_ds0:
-    jdbcUrl: jdbc:mysql://127.0.0.1:3306/login_database?allowPublicKeyRetrieval=true&useSSL=false&serverTimezone=UTC
+    jdbcUrl: jdbc:mysql://127.0.0.1:3308/auth_database?allowPublicKeyRetrieval=true&useSSL=false&serverTimezone=UTC
     dataSourceClassName: com.zaxxer.hikari.HikariDataSource
     driverClassName: com.mysql.cj.jdbc.Driver
     username: ovelin
     password: ovelin
   identity_ds1:
-    jdbcUrl: jdbc:mysql://127.0.0.1:3307/login_database?allowPublicKeyRetrieval=true&useSSL=false&serverTimezone=UTC
+    jdbcUrl: jdbc:mysql://127.0.0.1:3309/auth_database?allowPublicKeyRetrieval=true&useSSL=false&serverTimezone=UTC
     dataSourceClassName: com.zaxxer.hikari.HikariDataSource
     driverClassName: com.mysql.cj.jdbc.Driver
     username: ovelin
