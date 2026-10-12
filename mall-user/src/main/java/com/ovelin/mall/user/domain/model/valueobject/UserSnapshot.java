@@ -17,6 +17,7 @@ public record UserSnapshot(
         Avatar avatar,
         Gender gender,
         Birthday birthday,
+        Long version,
         Instant createdAt,
         Instant updatedAt,
         Instant deregisteredAt) {

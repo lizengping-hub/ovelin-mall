@@ -29,7 +29,7 @@ public class UserAssemblerTest {
     private User createUser() {
         return User.reconstitute(new UserSnapshot(
                 id, name, source, UserStatus.ACTIVE,
-               null, null, null, Instant.now().truncatedTo(ChronoUnit.MILLIS), Instant.now().truncatedTo(ChronoUnit.MILLIS), null));
+               null, null, null, 0L, Instant.now().truncatedTo(ChronoUnit.MILLIS), Instant.now().truncatedTo(ChronoUnit.MILLIS), null));
     }
     @Nested
     class ToDTO {

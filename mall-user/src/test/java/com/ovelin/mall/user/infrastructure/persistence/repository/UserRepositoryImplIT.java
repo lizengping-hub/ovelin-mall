@@ -1,8 +1,12 @@
 package com.ovelin.mall.user.infrastructure.persistence.repository;
 
+import com.ovelin.mall.common.mybatis.plus.kernal.OvelinMybatisPlusConfig;
 import com.ovelin.mall.common.sharding.core.ov.ShardedId;
 import com.ovelin.mall.user.TestApplication;
+import com.ovelin.mall.user.domain.exception.ErrorCode;
 import com.ovelin.mall.user.domain.exception.InvalidUserStatusException;
+import com.ovelin.mall.user.domain.exception.UserDomainException;
+import com.ovelin.mall.user.domain.exception.UserNotFoundException;
 import com.ovelin.mall.user.domain.model.aggregate.User;
 import com.ovelin.mall.user.domain.model.enums.Gender;
 import com.ovelin.mall.user.domain.model.enums.RegisterSource;
@@ -15,6 +19,7 @@ import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.context.annotation.Import;
 import org.springframework.dao.DuplicateKeyException;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -23,6 +28,7 @@ import java.util.concurrent.atomic.AtomicLong;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.assertj.core.api.InstanceOfAssertFactories.comparable;
 
 /**
  * UserRepository 集成测试：连接真实数据库，验证单元测试验证不了的部分——
@@ -31,6 +37,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
  */
 // JUnit 的 @DisplayName 已 import，同名的值对象 DisplayName 只能写全限定名（见 name() 辅助方法）
 @SpringBootTest(classes = TestApplication.class)
+@Import(OvelinMybatisPlusConfig.class)
 @Transactional
 @DisplayName("UserRepository 集成测试")
   class UserRepositoryImplIT {
@@ -61,6 +68,11 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
     private User addAndReload(User user) {
         userRepository.add(user);
         return userRepository.findById(user.getId());
+    }
+    private User saveNewUser(){
+        User user = newUser(nextId());
+        userRepository.add(user);
+        return user;
     }
 
     @Nested
@@ -202,6 +214,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
             assertThat(userRepository.findById(ghost.getId())).isNull();
         }
+
     }
 
     @Nested
@@ -268,6 +281,73 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
             assertThat(userRepository.findById(loaded.getId()).getDeregisteredAt())
                     .isEqualTo(DEREGISTERED_AT);
+        }
+    }
+
+    @Nested
+    class OptimisticLock {
+
+        @Test
+        @DisplayName("更新成功后版本 +1，库里和内存里一致")
+        void updateIncrementsVersion() {
+            User user = saveNewUser();                         // add 后重新 findById，version = 0
+            user.changeDisplayName(name("bob"));
+
+            userRepository.update(user);
+
+            assertThat(user.getVersion()).isEqualTo(1L);       // 回写到聚合
+            User loaded = userRepository.findById(user.getId());
+            assertThat(loaded).isNotNull();
+            assertThat(loaded.getVersion()).isEqualTo(1L);
+        }
+
+        @Test
+        @DisplayName("基于旧版本的写入被拒绝，且不覆盖已提交的修改")
+        void staleWriteIsRejected() {
+            User saved = saveNewUser();
+            User copyA = userRepository.findById(saved.getId());
+            assertThat(copyA).isNotNull();
+            User copyB = userRepository.findById(saved.getId());
+            assertThat(copyB).isNotNull();
+            copyA.changeDisplayName(name("from-a"));
+            userRepository.update(copyA);
+
+            copyB.changeDisplayName(name("from-b"));
+            var e = assertThatThrownBy(() -> userRepository.update(copyB));
+                    e.isInstanceOf(UserDomainException.class)
+                    .extracting("errorCode").isEqualTo(ErrorCode.CONCURRENT_UPDATE);
+
+            User loaded = userRepository.findById(saved.getId());
+            assertThat(loaded).isNotNull();
+            assertThat(loaded.getDisplayName().value()).isEqualTo("from-a");
+        }
+
+        @Test
+        @DisplayName("注销前加载的旧副本，不能把脱敏后的资料覆盖回去")
+        void staleCopyCannotOverwriteDeregister() {
+            User saved = saveNewUser();
+            User stale = userRepository.findById(saved.getId());
+            User current = userRepository.findById(saved.getId());
+
+            current.deregister(Instant.now());
+            userRepository.update(current);
+            String desensitized = userRepository.findById(saved.getId())
+                    .getDisplayName().value();
+
+            stale.changeDisplayName(name("zombie"));
+            assertThatThrownBy(() -> userRepository.update(stale))
+                    .isInstanceOf(UserDomainException.class);
+
+            User finalState = userRepository.findById(saved.getId());
+            assertThat(finalState.getStatus()).isEqualTo(UserStatus.DELETED);
+            assertThat(finalState.getDisplayName().value()).isEqualTo(desensitized);
+        }
+        @Test
+        @DisplayName("更新一个不存在的用户")
+        void updateUserThatNotExit(){
+            User newUser = newUser(nextId());
+            assertThatThrownBy(() -> userRepository.update(newUser))
+                    .isInstanceOf(UserNotFoundException.class);
         }
     }
 }

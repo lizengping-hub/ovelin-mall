@@ -28,6 +28,7 @@ public final class UserPOConverter {
                 po.getAvatarUrl() != null ? Avatar.reconstitute(po.getAvatarUrl()) : null,
                 po.getGender() != null ? Gender.fromCode(po.getGender()) : null,
                 Birthday.reconstituteNullable(po.getBirthYear(), po.getBirthMonth(), po.getBirthDay()).orElseGet(()->null),
+                po.getVersion(),
                 po.getCreatedAt(),
                 po.getUpdatedAt(),
                 po.getDeregisteredAt()));
@@ -43,6 +44,7 @@ public final class UserPOConverter {
         po.setDeregisteredAt(user.getDeregisteredAt());
         po.setGender(user.getGender().getCode());
         po.setAvatarUrl(user.getAvatar() != null ? user.getAvatar().getUrl() : null);
+        po.setVersion(user.getVersion());
         if (user.getBirthday() != null) {
             po.setBirthYear(user.getBirthday().getYear());   // 可为 null
             po.setBirthMonth(user.getBirthday().getMonth());

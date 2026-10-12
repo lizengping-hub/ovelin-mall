@@ -30,6 +30,7 @@ public class User implements ShardedAggregateRoot<ShardedId> {
     private Gender gender;
     private Birthday birthday;
     private UserStatus status;
+    private Long version;
     private Instant createdAt;
     private Instant updatedAt;
     private Instant deregisteredAt;
@@ -45,6 +46,7 @@ public class User implements ShardedAggregateRoot<ShardedId> {
     public static User register(ShardedId id, DisplayName displayName, RegisterSource registerSource) {
         User user = new User(id, displayName, registerSource, UserStatus.ACTIVE);
         user.gender = Gender.UnKnown;
+        user.version = 0L;
         return user;
     }
 
@@ -54,12 +56,20 @@ public class User implements ShardedAggregateRoot<ShardedId> {
         user.avatar = s.avatar();
         user.gender = s.gender() != null ? s.gender() : Gender.UnKnown;
         user.birthday = s.birthday();
+        user.version = s.version();
         user.createdAt = s.createdAt();
         user.updatedAt = s.updatedAt();
         user.deregisteredAt = s.deregisteredAt();
         return user;
     }
-
+    /** 仅供仓储在持久化成功后调用，同步数据库中的新版本。 */
+    public void syncVersion(long persistedVersion) {
+        if (persistedVersion < this.version) {
+            throw new IllegalStateException("version must not go backwards: "
+                    + this.version + " -> " + persistedVersion);
+        }
+        this.version = persistedVersion;
+    }
     public void ban() {
         requireActive("ban");
         this.status = UserStatus.DISABLED;

@@ -1,6 +1,9 @@
 package com.ovelin.mall.user.infrastructure.persistence.repository;
 
 import com.ovelin.mall.common.sharding.core.ov.ShardedId;
+import com.ovelin.mall.user.domain.exception.ConcurrentUpdateException;
+import com.ovelin.mall.user.domain.exception.InvalidUserStatusException;
+import com.ovelin.mall.user.domain.exception.UserNotFoundException;
 import com.ovelin.mall.user.domain.model.aggregate.User;
 import com.ovelin.mall.user.domain.repository.UserRepository;
 import com.ovelin.mall.user.infrastructure.persistence.converter.UserPOConverter;
@@ -24,7 +27,15 @@ public class UserRepositoryImpl implements UserRepository{
     }
     @Override
     public void update(User user) {
-        UserPO userPO = UserPOConverter.toPO(user);
-        userMapper.updateById(userPO);
+        UserPO po = UserPOConverter.toPO(user);
+        int rows = userMapper.updateById(po);
+        if (rows == 0) {
+            if (userMapper.selectById(po.getId()) == null) {
+                throw new UserNotFoundException(user.getId().value());   // → 404
+            }
+            throw new ConcurrentUpdateException(user);                   // → 409
+        }
+        user.syncVersion(po.getVersion());
+
     }
 }

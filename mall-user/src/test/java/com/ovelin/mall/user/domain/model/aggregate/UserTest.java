@@ -36,7 +36,7 @@ class UserTest {
     private User userWith(UserStatus status) {
         return User.reconstitute(new UserSnapshot(
                 id, name, source, status,
-                mock(Avatar.class), Gender.UnKnown, mock(Birthday.class), null, null, null));
+                mock(Avatar.class), Gender.UnKnown, mock(Birthday.class), 0L, null, null, null));
     }
 
     @Nested
@@ -77,7 +77,7 @@ class UserTest {
         @DisplayName("gender 为空时回落为未知，其余字段原样还原")
         void genderFallsBackToUnknown() {
             User user = User.reconstitute(new UserSnapshot(
-                    id, name, source, UserStatus.DISABLED, null, null, null, null, null, null));
+                    id, name, source, UserStatus.DISABLED, null, null, null, 0L, null, null, null));
 
             assertThat(user.getStatus()).isEqualTo(UserStatus.DISABLED);
             assertThat(user.getGender()).isEqualTo(Gender.UnKnown);
