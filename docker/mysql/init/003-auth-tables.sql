@@ -9,6 +9,27 @@ BEGIN
     DECLARE shard_id INT DEFAULT 0;
     WHILE shard_id < 2 DO
         SET @statement_text = CONCAT(
+            'CREATE TABLE IF NOT EXISTS auth_database.user_', shard_id, ' (',
+                '`id`                 BIGINT UNSIGNED NOT NULL COMMENT ''主键ID'',',
+                '`display_name`       VARCHAR(50) NOT NULL COMMENT ''用户昵称/显示名，仅展示'',',
+                '`avatar_url`         VARCHAR(500) NULL COMMENT ''头像URL'',',
+                '`gender`             TINYINT      NULL DEFAULT 0 COMMENT ''性别：0-未知，1-男，2-女'',',
+                '`birth_year`         SMALLINT UNSIGNED         NULL COMMENT ''出生年份'',',
+                '`birth_month`        TINYINT UNSIGNED         NULL COMMENT ''出生月份'',',
+                '`birth_day`          TINYINT UNSIGNED         NULL COMMENT ''出生日期'',',
+                '`status`             TINYINT      NOT NULL DEFAULT 1 COMMENT ''账号状态：1-正常，0-禁用，2-注销'',',
+                '`register_source`    VARCHAR(20)  NULL COMMENT ''注册来源：如 h5、app、wechat_mini 等'',',
+                '`deregistered_at`    TIMESTAMP(3)     NULL DEFAULT NULL COMMENT ''软删除时间，只做记录，状态由status过滤，管理'',',
+                ' version             BIGINT           NOT NULL COMMENT ''版本控制'',',
+                '`created_at`         TIMESTAMP(3)     NOT NULL DEFAULT CURRENT_TIMESTAMP(3) COMMENT ''创建时间'',',
+                '`updated_at`         TIMESTAMP(3)     NOT NULL DEFAULT CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3) COMMENT ''更新时间'',',
+                'PRIMARY KEY (id)',
+                ') ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci'
+        );
+        PREPARE create_user_table FROM @statement_text;
+        EXECUTE create_user_table;
+        DEALLOCATE PREPARE create_user_table;
+        SET @statement_text = CONCAT(
             'CREATE TABLE IF NOT EXISTS auth_database.user_identity_', shard_id, ' (',
                 'id BIGINT NOT NULL COMMENT ''身份记录ID'',',
                 'user_id BIGINT NOT NULL COMMENT ''用户ID'',',
