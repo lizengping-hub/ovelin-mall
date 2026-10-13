@@ -9,6 +9,6 @@ import org.apache.ibatis.annotations.Select;
 
 @Mapper
 public interface ShardingTestIdentityMapper extends BaseMapper<ShardingTestIdentityPO> {
-    @Select("SELECT id, user_id, identity_type, identifier FROM sharding_test_identity WHERE identifier = #{identifier}")
+    @Select("SELECT id, user_id, identity_type, identifier FROM user_identity WHERE identifier = #{identifier}")
     ShardingTestIdentityPO selectByIdentifier(@Param("identifier") String identifier);
 }

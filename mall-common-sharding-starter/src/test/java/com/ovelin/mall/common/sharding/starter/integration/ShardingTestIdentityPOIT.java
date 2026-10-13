@@ -52,11 +52,11 @@ public class ShardingTestIdentityPOIT extends AbstractShardingTestPOIT {
         assertThat(identityPOByIdentifierWithMapper).isNotNull();
         assertThat(TestSQLExecutionHook.getActualSqls().size()).isEqualTo(3);
 
-        JdbcTemplate unshardedJdbcTemplate = unshardedJdbcTemplates.get("identity-ds"+dataSourceIndexResolver.resolve(shardId,2,2));
+        JdbcTemplate unshardedJdbcTemplate = unshardedJdbcTemplates.get("sharding-test-ds"+dataSourceIndexResolver.resolve(shardId,2,2));
         int tableIndex = tableIndexResolver.resolve(shardId,2,2);
 
-        ShardingTestIdentityPO identityPOByIdWithUnshardedJdbc = unshardedJdbcTemplate.queryForObject("SELECT id, user_id, identity_type, identifier FROM sharding_test_identity_" + tableIndex + " WHERE id = ?", IDENTITY_ROW_MAPPER, identityId);
-        ShardingTestIdentityPO identityPOByIdentifierWithUnshardedJdbc = unshardedJdbcTemplate.queryForObject("SELECT id, user_id, identity_type, identifier FROM sharding_test_identity_" + tableIndex + " WHERE identifier = ?", IDENTITY_ROW_MAPPER, identifier);
+        ShardingTestIdentityPO identityPOByIdWithUnshardedJdbc = unshardedJdbcTemplate.queryForObject("SELECT id, user_id, identity_type, identifier FROM user_identity_" + tableIndex + " WHERE id = ?", IDENTITY_ROW_MAPPER, identityId);
+        ShardingTestIdentityPO identityPOByIdentifierWithUnshardedJdbc = unshardedJdbcTemplate.queryForObject("SELECT id, user_id, identity_type, identifier FROM user_identity_" + tableIndex + " WHERE identifier = ?", IDENTITY_ROW_MAPPER, identifier);
 
         assertThat(identityPOByIdWithUnshardedJdbc).isNotNull();
         assertThat(identityPOByIdentifierWithUnshardedJdbc).isNotNull();

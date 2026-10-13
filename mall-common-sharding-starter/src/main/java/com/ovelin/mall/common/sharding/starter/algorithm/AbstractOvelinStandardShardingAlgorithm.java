@@ -5,7 +5,10 @@ import org.apache.shardingsphere.sharding.api.sharding.standard.RangeShardingVal
 import org.apache.shardingsphere.sharding.api.sharding.standard.StandardShardingAlgorithm;
 
 import java.util.Collection;
-
+/**
+ * 按单个字段分片的标准分片方式；
+ * 不校验字段名字，支持String和ShardedId(Long)两种类型
+ */
 abstract class AbstractOvelinStandardShardingAlgorithm extends AbstractOvelinShardingAlgorithm<Comparable<?>> implements StandardShardingAlgorithm<Comparable<?>> {
 
 

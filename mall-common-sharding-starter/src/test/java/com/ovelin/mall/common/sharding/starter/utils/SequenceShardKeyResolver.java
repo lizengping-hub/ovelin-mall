@@ -34,4 +34,26 @@ public class SequenceShardKeyResolver {
 
     public record ShardKeyRecord(int shardIndex, ShardId shardId, String shardKey) {
     }
+
+    public static List<ShardKey2Record> getSequenceTwoShardKeys(int shardCount){
+        Map<Integer, ShardKey2Record> shardIdMap = new HashMap<>();
+        String shardKey0 = "EMAIL";
+        for (int i = 0; i < 1000; i++) {
+            String shardKey1 = "identity:" + i;
+            ShardId shardId = SHARD_RESOLVER.resolve(shardKey0, shardKey1);
+            if (shardId.value() % shardCount < shardCount){
+                shardIdMap.put(shardId.value() % shardCount, new ShardKey2Record(shardId.value() % shardCount, shardId, shardKey0, shardKey1));
+            }
+            if (shardIdMap.size() == shardCount){
+                break;
+            }
+        }
+        if (shardIdMap.size() < shardCount){
+            throw new IllegalStateException("Not enough sharding keys found for the given shard count");
+        }
+        return List.copyOf(shardIdMap.values()).stream().sorted(Comparator.comparingInt(ShardKey2Record::shardIndex)).toList();
+    }
+
+    public record ShardKey2Record(int shardIndex, ShardId shardId, String shardKey0, String shardKey1) {
+    }
 }

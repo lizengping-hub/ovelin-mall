@@ -1,9 +1,11 @@
 package com.ovelin.mall.common.sharding.starter.algorithm;
 
-import com.ovelin.mall.common.sharding.core.core.HashShardResolver;
 import com.ovelin.mall.common.sharding.core.ov.ShardId;
-
-public class OvelinDsComplexShardingAlgorithm extends AbstractOvelinComplexShardingAlgorithm {
+/**
+ * 按单个字段分片计算数据源的标准分片方式；
+ * 不校验字段名字，支持String和ShardedId(Long)两种类型
+ */
+public class OvelinStandardDsShardingAlgorithm extends AbstractOvelinStandardShardingAlgorithm {
     @Override
     protected int resolveIndex(ShardId shardId) {
         return dataSourceIndexResolver.resolve(shardId, dsCount, tableCount);
@@ -11,6 +13,6 @@ public class OvelinDsComplexShardingAlgorithm extends AbstractOvelinComplexShard
 
     @Override
     public String getType() {
-        return "OVELIN_DS_COMPLEX_SHARDING";
+        return "OVELIN_STANDARD_DS_SHARDING";
     }
 }

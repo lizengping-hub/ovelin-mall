@@ -13,7 +13,7 @@ import java.time.LocalDateTime;
  * 对应表：sharding_test_identity
  */
 @Data
-@TableName("sharding_test_identity")
+@TableName("user_identity")
 public class ShardingTestIdentityPO {
 
     private Long id;

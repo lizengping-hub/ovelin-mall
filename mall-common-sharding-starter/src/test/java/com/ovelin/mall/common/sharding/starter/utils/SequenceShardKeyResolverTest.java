@@ -9,7 +9,7 @@ import static org.assertj.core.api.AssertionsForClassTypes.assertThat;
 
 public class SequenceShardKeyResolverTest {
     @Test
-    void testGetEntriesForShardingKeys() {
+    void testGetSequenceShardKeys() {
         int shardCount = 8;
         List<SequenceShardKeyResolver.ShardKeyRecord> shardKeys = SequenceShardKeyResolver.getSequenceShardKeys(shardCount);
         assertThat(shardKeys.size()).isEqualTo(shardCount);
@@ -17,5 +17,13 @@ public class SequenceShardKeyResolverTest {
             assertThat(shardKeys.get(i).shardIndex()).isEqualTo(i);
         }
     }
-
+    @Test
+    void testGetSequenceTwoShardKeys() {
+        int shardCount = 8;
+        List<SequenceShardKeyResolver.ShardKey2Record> shardKeys = SequenceShardKeyResolver.getSequenceTwoShardKeys(shardCount);
+        assertThat(shardKeys.size()).isEqualTo(shardCount);
+        for (int i = 0; i < shardKeys.size(); i++) {
+            assertThat(shardKeys.get(i).shardIndex()).isEqualTo(i);
+        }
+    }
 }

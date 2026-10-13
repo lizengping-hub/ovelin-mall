@@ -9,38 +9,35 @@ import java.util.*;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
-public class AbstractComplexShardingAlgorithmTest extends AbstractShardingAlgorithmTest{
+public class AbstractComplexShardingAlgorithmTest{
+    void shouldShardingStringKey(SequenceShardKeyResolver.ShardKey2Record shardKey, AbstractOvelinComplexShardingAlgorithm ovelinDsComplexShardingAlgorithm, Set<String> availableTargetNames, String targetName) {
+        ShardedId shardedId = ShardedId.of(shardKey.shardId(), System.currentTimeMillis());
+        shouldShardingShardedId(ovelinDsComplexShardingAlgorithm, availableTargetNames, targetName, shardedId, null, null);
+        shouldShardingShardedId(ovelinDsComplexShardingAlgorithm, availableTargetNames, targetName, null, shardKey.shardKey0(), shardKey.shardKey1());
+        shouldShardingShardedId(ovelinDsComplexShardingAlgorithm, availableTargetNames, targetName, shardedId, shardKey.shardKey0(), shardKey.shardKey1());
+    }
     void shouldShardingStringKey(SequenceShardKeyResolver.ShardKeyRecord shardKey, AbstractOvelinComplexShardingAlgorithm ovelinDsComplexShardingAlgorithm, Set<String> availableTargetNames, String targetName) {
         ShardedId shardedId = ShardedId.of(shardKey.shardId(), System.currentTimeMillis());
-        shouldShardingShardedId(ovelinDsComplexShardingAlgorithm, availableTargetNames, shardedId, targetName);
-        shouldShardingShardedId(ovelinDsComplexShardingAlgorithm, availableTargetNames, shardKey.shardKey(), targetName);
-        shouldShardingShardedId(ovelinDsComplexShardingAlgorithm, availableTargetNames, shardedId, shardKey.shardKey(), targetName);
+        shouldShardingShardedId(ovelinDsComplexShardingAlgorithm, availableTargetNames, targetName, shardedId, null, null);
+        shouldShardingShardedId(ovelinDsComplexShardingAlgorithm, availableTargetNames, targetName, null, shardKey.shardKey(), null);
+        shouldShardingShardedId(ovelinDsComplexShardingAlgorithm, availableTargetNames, targetName, shardedId, shardKey.shardKey(), null);
     }
-    void shouldShardingShardedId(AbstractOvelinComplexShardingAlgorithm ovelinDsComplexShardingAlgorithm, Set<String> availableTargetNames, ShardedId shardedId, String shardingKey, String targetName) {
+    void shouldShardingShardedId(AbstractOvelinComplexShardingAlgorithm ovelinDsComplexShardingAlgorithm, Set<String> availableTargetNames, String targetName, ShardedId shardedId, String shardingKey0, String shardingKey1) {
         HashMap<String, Collection<Comparable<?>>> columnNameAndShardingValuesMap = new HashMap<>();
-        columnNameAndShardingValuesMap.put("k", new HashSet<>(List.of(shardingKey)));
-        columnNameAndShardingValuesMap.put("k2", new HashSet<>(List.of(shardedId.value())));
+        if (shardedId != null){
+            columnNameAndShardingValuesMap.put("k2", new HashSet<>(List.of(shardedId.value())));
+        }
+        if (shardingKey0 != null){
+            columnNameAndShardingValuesMap.put("identity_type", new HashSet<>(List.of(shardingKey0)));
+        }
+        if (shardingKey1 != null){
+            columnNameAndShardingValuesMap.put("identifier", new HashSet<>(List.of(shardingKey1)));
+        }
+
         Map<String, Range<Comparable<?>>> columnNameAndRangeValuesMap = new HashMap<>();
         ComplexKeysShardingValue<Comparable<?>> shardingValue = new ComplexKeysShardingValue<>("table", columnNameAndShardingValuesMap, columnNameAndRangeValuesMap);
         Collection<String> resultDsNames = ovelinDsComplexShardingAlgorithm.doSharding(availableTargetNames, shardingValue);
         assertEquals(Set.of(targetName), resultDsNames);
     }
 
-    void shouldShardingShardedId(AbstractOvelinComplexShardingAlgorithm ovelinDsComplexShardingAlgorithm, Set<String> availableTargetNames, String shardingKey, String targetName) {
-        HashMap<String, Collection<Comparable<?>>> columnNameAndShardingValuesMap = new HashMap<>();
-        columnNameAndShardingValuesMap.put("k", new HashSet<>(List.of(shardingKey)));
-        Map<String, Range<Comparable<?>>> columnNameAndRangeValuesMap = new HashMap<>();
-        ComplexKeysShardingValue<Comparable<?>> shardingValue = new ComplexKeysShardingValue<>("table", columnNameAndShardingValuesMap, columnNameAndRangeValuesMap);
-        Collection<String> resultDsNames = ovelinDsComplexShardingAlgorithm.doSharding(availableTargetNames, shardingValue);
-        assertEquals(Set.of(targetName), resultDsNames);
-    }
-
-    void shouldShardingShardedId(AbstractOvelinComplexShardingAlgorithm ovelinDsComplexShardingAlgorithm, Set<String> availableTargetNames, ShardedId shardedId, String targetName) {
-        HashMap<String, Collection<Comparable<?>>> columnNameAndShardingValuesMap = new HashMap<>();
-        columnNameAndShardingValuesMap.put("shard_id", new HashSet<>(List.of(shardedId.value())));
-        Map<String, Range<Comparable<?>>> columnNameAndRangeValuesMap = new HashMap<>();
-        ComplexKeysShardingValue<Comparable<?>> shardingValue = new ComplexKeysShardingValue<>("table", columnNameAndShardingValuesMap, columnNameAndRangeValuesMap);
-        Collection<String> resultDsNames = ovelinDsComplexShardingAlgorithm.doSharding(availableTargetNames, shardingValue);
-        assertEquals(Set.of(targetName), resultDsNames);
-    }
 }

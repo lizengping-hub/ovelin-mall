@@ -1,0 +1,80 @@
+package com.ovelin.mall.common.sharding.starter.algorithm;
+
+
+import static com.ovelin.mall.common.sharding.starter.algorithm.ShardingAlgorithmTestConfig.*;
+import com.ovelin.mall.common.sharding.core.ov.ShardedId;
+import com.ovelin.mall.common.sharding.starter.utils.SequenceShardKeyResolver;
+import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.Test;
+
+import java.util.*;
+
+import static org.junit.jupiter.api.Assertions.assertEquals;
+
+public class OvelinStandardTableShardingAlgorithmTest extends AbstractStandardShardingAlgorithmTest {
+    private final static OvelinStandardTableShardingAlgorithm ALGORITHM_2_2 = new OvelinStandardTableShardingAlgorithm();
+    private final static OvelinStandardTableShardingAlgorithm ALGORITHM_4_2 = new OvelinStandardTableShardingAlgorithm();
+    private final static OvelinStandardTableShardingAlgorithm ALGORITHM_4_4 = new OvelinStandardTableShardingAlgorithm();
+
+    @BeforeAll
+    static void setUp() {
+        ALGORITHM_2_2.init(CONFIG_2_2.properties());
+        ALGORITHM_4_2.init(CONFIG_4_2.properties());
+        ALGORITHM_4_4.init(CONFIG_4_4.properties());
+    }
+    @Test
+    void shouldShardingShardedIdConfig_2_2(){
+        String[] tables = {"table0","table1", "table0", "table1", "table0","table1", "table0", "table1"};
+        for (int i = 0; i < 8; i++) {
+            shouldShardingShardedId(ALGORITHM_2_2, CONFIG_2_2, ShardedId.of(i, System.currentTimeMillis()), tables[i]);
+        }
+    }
+    @Test
+    void shouldShardingShardedIdConfig_4_2(){
+        String[] tables = {"table0","table1", "table0", "table1", "table0","table1", "table0", "table1"};
+        for (int i = 0; i < 8; i++) {
+            shouldShardingShardedId(ALGORITHM_4_2, CONFIG_4_2, ShardedId.of(i, System.currentTimeMillis()), tables[i]);
+        }
+    }
+    @Test
+    void shouldShardingShardedIdConfig_4_4(){
+        String[] tables = {"table0","table1","table2","table3", "table0", "table1", "table2", "table3"};
+        for (int i = 0; i < 8; i++) {
+            shouldShardingShardedId(ALGORITHM_4_4, CONFIG_4_4, ShardedId.of(i, System.currentTimeMillis()), tables[i]);
+        }
+    }
+
+
+    @Test
+    void shouldShardingStringFieldConfig_2_2(){
+        List<SequenceShardKeyResolver.ShardKeyRecord> shardKeys = SequenceShardKeyResolver.getSequenceShardKeys(4);
+        String[] tables = {"table0","table1", "table0", "table1", };
+        for (int i = 0; i < 4; i++) {
+            shouldShardingShardedId(shardKeys.get(i), ALGORITHM_2_2, CONFIG_2_2, tables[i]);
+        }
+    }
+
+    @Test
+    void shouldShardingStringFieldConfig_4_2(){
+        List<SequenceShardKeyResolver.ShardKeyRecord> shardKeys = SequenceShardKeyResolver.getSequenceShardKeys(8);
+        String[] tables = {"table0","table1", "table0", "table1", "table0","table1", "table0", "table1"};
+        for (int i = 0; i < 8; i++) {
+            shouldShardingShardedId(shardKeys.get(i), ALGORITHM_4_2, CONFIG_4_2, tables[i]);
+        }
+    }
+    @Test
+    void shouldShardingStringFieldConfig_4_4(){
+        List<SequenceShardKeyResolver.ShardKeyRecord> shardKeys = SequenceShardKeyResolver.getSequenceShardKeys(8);
+        String[] tables = {"table0","table1","table2","table3", "table0", "table1", "table2", "table3"};
+        for (int i = 0; i < 8; i++) {
+            shouldShardingShardedId(shardKeys.get(i), ALGORITHM_4_4, CONFIG_4_4, tables[i]);
+        }
+    }
+    void shouldShardingShardedId(SequenceShardKeyResolver.ShardKeyRecord shardKeyRecord, OvelinStandardTableShardingAlgorithm ovelinDsComplexShardingAlgorithm, ShardingAlgorithmTestConfig.Config config, String tables) {
+        super.shouldShardingShardedId(shardKeyRecord, ovelinDsComplexShardingAlgorithm, config.tableNames(), tables);
+    }
+
+    void shouldShardingShardedId(OvelinStandardTableShardingAlgorithm ovelinTableStandardShardingAlgorithm, Config config, ShardedId shardedId, String table) {
+        super.shouldShardingShardedId(ovelinTableStandardShardingAlgorithm, config.tableNames(), shardedId.value(), table);
+    }
+}

@@ -26,9 +26,9 @@ BEGIN
                 'PRIMARY KEY (id)',
                 ') ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci'
         );
-        PREPARE create_user_table FROM @statement_text;
-        EXECUTE create_user_table;
-        DEALLOCATE PREPARE create_user_table;
+        PREPARE create_table FROM @statement_text;
+        EXECUTE create_table;
+        DEALLOCATE PREPARE create_table;
         SET @statement_text = CONCAT(
             'CREATE TABLE IF NOT EXISTS auth_database.user_identity_', shard_id, ' (',
                 'id BIGINT NOT NULL COMMENT ''身份记录ID'',',
@@ -49,9 +49,9 @@ BEGIN
                       COLLATE = utf8mb4_0900_ai_ci
                       COMMENT = ''用户登录身份'''
         );
-        PREPARE create_login_table FROM @statement_text;
-        EXECUTE create_login_table;
-        DEALLOCATE PREPARE create_login_table;
+        PREPARE create_table FROM @statement_text;
+        EXECUTE create_table;
+        DEALLOCATE PREPARE create_table;
 
         SET @statement_text = CONCAT(
                     'CREATE TABLE IF NOT EXISTS auth_database.identity_lookup_', shard_id, ' (',
@@ -65,9 +65,9 @@ BEGIN
                               COLLATE = utf8mb4_0900_ai_ci
                               COMMENT = ''登录标识到用户的映射'''
                 );
-        PREPARE create_login_table FROM @statement_text;
-        EXECUTE create_login_table;
-        DEALLOCATE PREPARE create_login_table;
+        PREPARE create_table FROM @statement_text;
+        EXECUTE create_table;
+        DEALLOCATE PREPARE create_table;
 
         SET @statement_text = CONCAT(
                     'CREATE TABLE IF NOT EXISTS auth_database.user_password_', shard_id, ' (',
@@ -85,9 +85,9 @@ BEGIN
                               COLLATE = utf8mb4_0900_ai_ci
                               COMMENT = ''用户密码'''
                 );
-        PREPARE create_login_table FROM @statement_text;
-        EXECUTE create_login_table;
-        DEALLOCATE PREPARE create_login_table;
+        PREPARE create_table FROM @statement_text;
+        EXECUTE create_table;
+        DEALLOCATE PREPARE create_table;
 
         SET @statement_text = CONCAT(
                     'CREATE TABLE IF NOT EXISTS auth_database.user_mfa_factor_', shard_id, ' (',
@@ -109,9 +109,9 @@ BEGIN
                               COLLATE = utf8mb4_0900_ai_ci
                               COMMENT = ''用户二次验证因子'''
                 );
-        PREPARE create_login_table FROM @statement_text;
-        EXECUTE create_login_table;
-        DEALLOCATE PREPARE create_login_table;
+        PREPARE create_table FROM @statement_text;
+        EXECUTE create_table;
+        DEALLOCATE PREPARE create_table;
 
 SET shard_id = shard_id + 1;
 END WHILE;

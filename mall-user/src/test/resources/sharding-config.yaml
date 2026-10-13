@@ -40,15 +40,15 @@ rules:
 
   shardingAlgorithms:
     ovelin_db_algo:
-      type: OVELIN_DS_STANDARD_SHARDING
+      type: OVELIN_STANDARD_DS_SHARDING
       props:
-        table-count: 2
-        ds-count: 2
+        table_count: 2
+        ds_count: 2
     ovelin_table_algo:
-      type: OVELIN_TABLE_STANDARD_SHARDING
+      type: OVELIN_STANDARD_TABLE_SHARDING
       props:
-        table-count: 2
-        ds-count: 2
+        table_count: 2
+        ds_count: 2
 
 props:
   sql-show: true

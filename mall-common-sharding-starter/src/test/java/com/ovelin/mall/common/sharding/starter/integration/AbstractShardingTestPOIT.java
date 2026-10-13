@@ -6,6 +6,7 @@ import com.ovelin.mall.common.sharding.starter.integration.mapper.ShardingTestId
 import com.ovelin.mall.common.sharding.starter.integration.mapper.ShardingTestUserMapper;
 import com.ovelin.mall.common.sharding.starter.integration.po.ShardingTestIdentityPO;
 import com.ovelin.mall.common.sharding.starter.integration.po.ShardingTestUserPO;
+import com.ovelin.mall.common.sharding.starter.integration.po.UserByPhonePO;
 import com.zaxxer.hikari.HikariConfig;
 import com.zaxxer.hikari.HikariDataSource;
 import org.junit.jupiter.api.BeforeEach;
@@ -44,12 +45,18 @@ abstract class AbstractShardingTestPOIT {
                 return po;
             };
 
+    static final RowMapper<UserByPhonePO> USER_BY_PHONE_ROW_MAPPER =
+            (rs, rowNum) -> {
+                UserByPhonePO po = new UserByPhonePO();
+                po.setUserId(rs.getLong("user_id"));
+                po.setPhone(rs.getString("phone"));
+                return po;
+            };
+
 
     Map<String, JdbcTemplate> unshardedJdbcTemplates = Map.of(
-            "identity-ds0", createUnshardedJdbcTemplate(3308, "sharding_test_identity_database", "identity-ds0"),
-            "user-ds0", createUnshardedJdbcTemplate(3308, "sharding_test_user_database", "user-ds0"),
-            "identity-ds1", createUnshardedJdbcTemplate(3309, "sharding_test_identity_database", "identity-ds1"),
-            "user-ds1", createUnshardedJdbcTemplate(3309, "sharding_test_user_database", "user-ds1")
+            "sharding-test-ds0", createUnshardedJdbcTemplate(3308, "sharding_test", "sharding-test-ds0"),
+            "sharding-test-ds1", createUnshardedJdbcTemplate(3309, "sharding_test", "sharding-test-ds1")
     );
 
     static JdbcTemplate createUnshardedJdbcTemplate(int port, String database, String instanceKey) {
@@ -67,7 +74,7 @@ abstract class AbstractShardingTestPOIT {
 
     @BeforeEach
     void cleanTables() {
-        jdbcTemplate.execute("TRUNCATE TABLE sharding_test_identity");
-        jdbcTemplate.execute("TRUNCATE TABLE sharding_test_user");
+        jdbcTemplate.execute("TRUNCATE TABLE user_identity");
+        jdbcTemplate.execute("TRUNCATE TABLE user");
     }
 }

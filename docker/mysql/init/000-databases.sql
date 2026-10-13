@@ -4,9 +4,6 @@ CREATE DATABASE IF NOT EXISTS shared_database
 CREATE DATABASE IF NOT EXISTS auth_database
     CHARACTER SET utf8mb4
     COLLATE utf8mb4_0900_ai_ci;
-CREATE DATABASE IF NOT EXISTS sharding_test_user_database
-    CHARACTER SET utf8mb4
-    COLLATE utf8mb4_0900_ai_ci;
-CREATE DATABASE IF NOT EXISTS sharding_test_identity_database
+CREATE DATABASE IF NOT EXISTS sharding_test
     CHARACTER SET utf8mb4
     COLLATE utf8mb4_0900_ai_ci;

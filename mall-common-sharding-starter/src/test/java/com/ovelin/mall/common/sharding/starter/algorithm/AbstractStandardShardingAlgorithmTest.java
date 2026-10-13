@@ -9,27 +9,18 @@ import java.util.Set;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
-public class AbstractStandardShardingAlgorithmTest extends AbstractShardingAlgorithmTest{
+public class AbstractStandardShardingAlgorithmTest{
     void shouldShardingShardedId(SequenceShardKeyResolver.ShardKeyRecord shardKeyRecord, AbstractOvelinStandardShardingAlgorithm ovelinDsComplexShardingAlgorithm, Set<String> availableTargetNames
-            , String tables) {
-        shouldShardingShardedId(ovelinDsComplexShardingAlgorithm, availableTargetNames, shardKeyRecord.shardKey(), tables);
-        shouldShardingShardedId(ovelinDsComplexShardingAlgorithm, availableTargetNames, ShardedId.of(shardKeyRecord.shardId(), System.currentTimeMillis()), tables);
+            , String targetName) {
+        shouldShardingShardedId(ovelinDsComplexShardingAlgorithm, availableTargetNames, shardKeyRecord.shardKey(), targetName);
+        shouldShardingShardedId(ovelinDsComplexShardingAlgorithm, availableTargetNames, ShardedId.of(shardKeyRecord.shardId(), System.currentTimeMillis()).value(), targetName);
     }
-    void shouldShardingShardedId(AbstractOvelinStandardShardingAlgorithm ovelinDsComplexShardingAlgorithm, Set<String> availableTargetNames, String shardingKey, String ds) {
 
+    void shouldShardingShardedId(AbstractOvelinStandardShardingAlgorithm ovelinDsComplexShardingAlgorithm, Set<String> availableTargetNames, Comparable<?> shardingKey, String targetName) {
         DataNodeInfo dataNodeInfo = new DataNodeInfo("table", 1, 'g');
         PreciseShardingValue<Comparable<?>> preciseShardingValue = new PreciseShardingValue<>("table", "k2", dataNodeInfo, shardingKey);
 
-        String resultDsName = ovelinDsComplexShardingAlgorithm.doSharding(availableTargetNames, preciseShardingValue);
-        assertEquals(ds, resultDsName);
-    }
-
-    void shouldShardingShardedId(AbstractOvelinStandardShardingAlgorithm ovelinDsComplexShardingAlgorithm, Set<String> availableTargetNames, ShardedId shardedId, String ds) {
-        DataNodeInfo dataNodeInfo = new DataNodeInfo("table", 1, 'g');
-        PreciseShardingValue<Comparable<?>> preciseShardingValue = new PreciseShardingValue<>("table", "k2", dataNodeInfo,
-                shardedId.value());
-
-        String resultDsName = ovelinDsComplexShardingAlgorithm.doSharding(availableTargetNames, preciseShardingValue);
-        assertEquals(ds, resultDsName);
+        String resultName = ovelinDsComplexShardingAlgorithm.doSharding(availableTargetNames, preciseShardingValue);
+        assertEquals(targetName, resultName);
     }
 }

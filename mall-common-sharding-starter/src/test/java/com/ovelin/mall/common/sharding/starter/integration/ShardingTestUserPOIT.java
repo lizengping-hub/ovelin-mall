@@ -32,8 +32,8 @@ public class ShardingTestUserPOIT extends AbstractShardingTestPOIT {
         assertThat(userPoBYMapper).isNotNull();
         assertThat(userPoBYMapper.getId()).isEqualTo(userId);
 
-        JdbcTemplate jdbcTemplate = unshardedJdbcTemplates.get("user-ds" + dataSourceIndexResolver.resolve(shardId, 2, 2));
-        ShardingTestUserPO userPO1 = jdbcTemplate.queryForObject("SELECT id, display_name FROM sharding_test_user_" + tableIndexResolver.resolve(shardId, 2, 2) + " WHERE id = ?", USER_ROW_MAPPER, userId);
+        JdbcTemplate jdbcTemplate = unshardedJdbcTemplates.get("sharding-test-ds" + dataSourceIndexResolver.resolve(shardId, 2, 2));
+        ShardingTestUserPO userPO1 = jdbcTemplate.queryForObject("SELECT id, display_name FROM user_" + tableIndexResolver.resolve(shardId, 2, 2) + " WHERE id = ?", USER_ROW_MAPPER, userId);
     }
 
 }

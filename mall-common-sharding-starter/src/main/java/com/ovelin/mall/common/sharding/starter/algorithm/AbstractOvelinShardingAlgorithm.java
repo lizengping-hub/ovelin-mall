@@ -12,31 +12,36 @@ import org.apache.shardingsphere.sharding.spi.ShardingAlgorithm;
 
 import java.util.Properties;
 
+/**
+ * 分片算法基类，处理分片数据源数量每个数据源中表数量的配置，和将不同类型的字段应用不同的分片逻辑，目前支持ShardedId和String
+ * @param <T>
+ */
 abstract class AbstractOvelinShardingAlgorithm<T extends Comparable<?>> implements ShardingAlgorithm {
     protected int dsCount;
     protected int tableCount;
-    private  static final ShardResolver shardResolver = new HashShardResolver();
+    protected static final ShardResolver shardResolver = new HashShardResolver();
     protected static final DataSourceIndexResolver dataSourceIndexResolver = new DataSourceIndexResolverImpl();
     protected static final TableIndexResolver tableIndexResolver = new TableIndexResolverImpl();
     @Override
     public void init(Properties props) {
-        Object dsCount = props.get("ds-count");
+        Object dsCount = props.get("ds_count");
         if (dsCount == null) {
-            throw new IllegalArgumentException("dsCount is required");
-        }
-        Object tableCount = props.get("table-count");
-        if (tableCount == null) {
-            throw new IllegalArgumentException("tableCount is required");
+            throw new IllegalArgumentException("ds_count is required");
         }
         try {
             this.dsCount = Integer.parseInt(dsCount.toString());
         } catch (NumberFormatException e) {
-            throw new IllegalArgumentException("dsCount must be a valid number", e);
+            throw new IllegalArgumentException("ds_count must be a valid number", e);
+        }
+
+        Object tableCount = props.get("table_count");
+        if (tableCount == null) {
+            throw new IllegalArgumentException("table_count is required");
         }
         try {
             this.tableCount = Integer.parseInt(tableCount.toString());
         } catch (NumberFormatException e) {
-            throw new IllegalArgumentException("tableCount must be a valid number", e);
+            throw new IllegalArgumentException("table_count must be a valid number", e);
         }
     }
     protected abstract int resolveIndex(ShardId shardId);

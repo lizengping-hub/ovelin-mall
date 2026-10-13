@@ -9,7 +9,7 @@ import lombok.Data;
  * 对应表：sharding_test_user
  */
 @Data
-@TableName("sharding_test_user")
+@TableName("user")
 public class ShardingTestUserPO {
     private Long id;
     private String displayName;

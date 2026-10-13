@@ -4,6 +4,5 @@ GRANT ALL PRIVILEGES ON shared_database.* TO 'ovelin'@'%';
 GRANT ALL PRIVILEGES ON auth_database.* TO 'ovelin'@'%';
 
 
-GRANT ALL PRIVILEGES ON sharding_test_user_database.* TO 'ovelin'@'%';
-GRANT ALL PRIVILEGES ON sharding_test_identity_database.* TO 'ovelin'@'%';
+GRANT ALL PRIVILEGES ON sharding_test.* TO 'ovelin'@'%';
 FLUSH PRIVILEGES;
