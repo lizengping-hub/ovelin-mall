@@ -20,11 +20,11 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
-public class UserApplicationServiceTest {
+public class UserAppServiceTest {
     @Mock
     UserRepository userRepository;
     @InjectMocks
-    UserApplicationService userApplicationService;
+    UserAppService userApplicationService;
 
     @Test
     void updateDisplayName_shouldThrowWhenUserNotFound() {

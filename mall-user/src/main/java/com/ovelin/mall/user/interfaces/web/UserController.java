@@ -2,7 +2,7 @@ package com.ovelin.mall.user.interfaces.web;
 
 import com.ovelin.mall.user.api.UserDTO;
 import com.ovelin.mall.user.api.UserQueryService;
-import com.ovelin.mall.user.application.service.UserApplicationService;
+import com.ovelin.mall.user.application.service.UserAppService;
 import com.ovelin.mall.user.domain.exception.UserNotFoundException;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.Max;
@@ -20,7 +20,7 @@ import java.time.Instant;
 @RequiredArgsConstructor
 public class UserController {
 
-    private final UserApplicationService userApplicationService;
+    private final UserAppService userApplicationService;
 
     private final UserQueryService userQueryService;
 

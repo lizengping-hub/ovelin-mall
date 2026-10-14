@@ -1,7 +1,8 @@
 package com.ovelin.mall.user.application.service;
 
 import com.ovelin.mall.common.sharding.core.ov.ShardedId;
-import com.ovelin.mall.user.api.UserDTO;
+import com.ovelin.mall.user.api.CreateUserCommand;
+import com.ovelin.mall.user.api.UserApi;
 import com.ovelin.mall.user.application.assembler.UserAssembler;
 import com.ovelin.mall.user.domain.exception.UserNotFoundException;
 import com.ovelin.mall.user.domain.model.aggregate.User;
@@ -15,7 +16,7 @@ import java.time.Instant;
 
 @Service
 @AllArgsConstructor
-public class UserApplicationService {
+public class UserAppService implements UserApi {
     UserRepository userRepository;
 
     public void updateDisplayName(Long id, String displayName) {
@@ -48,11 +49,23 @@ public class UserApplicationService {
         user.changeGender(genderEnum);
         userRepository.update(user);
     }
-
+    @Override
     public void deregister(Long id, Instant at) {
         User user = getUser(id);
         user.deregister(at);
         userRepository.update(user);
+    }
+
+    @Override
+    public void createUser(CreateUserCommand command) {
+        User user = UserAssembler.toUser(command);
+        userRepository.add(user);
+    }
+
+    @Override
+    public void createUser(Long userId, String displayName, String registerSource) {
+        CreateUserCommand command = CreateUserCommand.builder(ShardedId.fromId(userId), displayName, registerSource).build();
+        createUser(command);
     }
 
     private User getUser(Long id) {

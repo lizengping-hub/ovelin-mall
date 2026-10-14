@@ -152,7 +152,8 @@ class UserLifecycleIT {
      * 前置数据：沿用你原 UserLifecycleIT 里“创建用户”的方式，返回用户 id。
      */
     private Long createUser(ShardedId shardedId, String name) {
-        return userApi.createUser(
-                CreateUserCommand.builder(shardedId, name, RegisterSource.WEB.code()).build()).value();
+        userApi.createUser(
+                CreateUserCommand.builder(shardedId, name, RegisterSource.WEB.code()).build());
+        return shardedId.value();
     }
 }

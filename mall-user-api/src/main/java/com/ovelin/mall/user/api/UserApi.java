@@ -1,7 +1,10 @@
 package com.ovelin.mall.user.api;
 
-import com.ovelin.mall.common.sharding.core.ov.ShardedId;
+import java.time.Instant;
 
 public interface UserApi {
-    ShardedId createUser(CreateUserCommand command);
+    void createUser(CreateUserCommand command);
+    void createUser(Long userId, String displayName, String registerSource);
+    void deregister(Long id, Instant at);
+
 }

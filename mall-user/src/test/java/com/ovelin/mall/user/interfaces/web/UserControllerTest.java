@@ -4,7 +4,7 @@ import com.ovelin.mall.common.web.starter.GlobalExceptionHandlerAutoConfiguratio
 import com.ovelin.mall.common.web.starter.LongToStringJacksonAutoConfiguration;
 import com.ovelin.mall.user.api.UserDTO;
 import com.ovelin.mall.user.api.UserQueryService;
-import com.ovelin.mall.user.application.service.UserApplicationService;
+import com.ovelin.mall.user.application.service.UserAppService;
 import com.ovelin.mall.user.domain.exception.ErrorCode;
 import com.ovelin.mall.user.domain.exception.InvalidArgumentException;
 import com.ovelin.mall.user.domain.exception.UserNotFoundException;
@@ -38,7 +38,7 @@ class UserControllerTest {
     @Autowired
     MockMvc mockMvc;
     @MockitoBean
-    UserApplicationService userApplicationService;
+    UserAppService userApplicationService;
     @MockitoBean
     UserQueryService userQueryService;
 
