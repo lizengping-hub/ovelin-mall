@@ -1,6 +1,7 @@
 package com.ovelin.mall.user.domain.model.valueobject;
 
-import com.ovelin.mall.user.domain.exception.InvalidArgumentException;
+
+import com.ovelin.mall.common.exception.global.InvalidArgumentException;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;

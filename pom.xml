@@ -79,7 +79,17 @@
             </dependency>
             <dependency>
                 <groupId>com.ovelin</groupId>
+                <artifactId>mall-user</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>com.ovelin</groupId>
                 <artifactId>mall-common-mybatis-plus-kernal</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>com.ovelin</groupId>
+                <artifactId>mall-common-exception</artifactId>
                 <version>${project.version}</version>
             </dependency>
             <dependency>
@@ -155,6 +165,7 @@
         </plugins>
     </build>
     <modules>
+        <module>mall-common-exception</module>
         <module>mall-common-mybatis-plus-kernal</module>
         <module>mall-common-test-environment-support</module>
         <module>mall-common-web-starter</module>

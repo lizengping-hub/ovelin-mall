@@ -1,12 +1,14 @@
 package com.ovelin.mall.user.interfaces.web;
 
+import com.ovelin.mall.common.exception.global.InvalidArgumentException;
+import com.ovelin.mall.common.web.starter.GlobalDomainExceptionHandlerAutoConfiguration;
 import com.ovelin.mall.common.web.starter.GlobalExceptionHandlerAutoConfiguration;
 import com.ovelin.mall.common.web.starter.LongToStringJacksonAutoConfiguration;
+import com.ovelin.mall.common.web.starter.exceptionHandler.GlobalDomainExceptionHandler;
+import com.ovelin.mall.common.web.starter.exceptionHandler.GlobalExceptionHandler;
 import com.ovelin.mall.user.api.UserDTO;
 import com.ovelin.mall.user.api.UserQueryService;
 import com.ovelin.mall.user.application.service.UserAppService;
-import com.ovelin.mall.user.domain.exception.ErrorCode;
-import com.ovelin.mall.user.domain.exception.InvalidArgumentException;
 import com.ovelin.mall.user.domain.exception.UserNotFoundException;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
@@ -30,7 +32,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
 @WebMvcTest(UserController.class)
-@Import({LongToStringJacksonAutoConfiguration.class, GlobalExceptionHandlerAutoConfiguration.class})
+@Import({LongToStringJacksonAutoConfiguration.class, GlobalExceptionHandlerAutoConfiguration.class, GlobalDomainExceptionHandlerAutoConfiguration.class})
 class UserControllerTest {
 
     private static final long ID = 123456789L;
@@ -41,7 +43,10 @@ class UserControllerTest {
     UserAppService userApplicationService;
     @MockitoBean
     UserQueryService userQueryService;
-
+    @Autowired
+    GlobalExceptionHandler globalExceptionHandler;
+    @Autowired
+    GlobalDomainExceptionHandler globalDomainExceptionHandler;
     private static String json(String s) {
         return s.replace('\'', '"');   // 测试里用单引号写 JSON，省去转义
     }
@@ -72,7 +77,7 @@ class UserControllerTest {
             mockMvc.perform(get("/users/{id}", ID))
                     .andExpect(status().isNotFound())
                     .andExpect(jsonPath("$.code").value("USER_NOT_FOUND"))
-                    .andExpect(jsonPath("$.detail").value(ErrorCode.USER_NOT_FOUND.clientMessage()));
+                    .andExpect(jsonPath("$.detail").value("用户不存在"));
         }
 
     }
@@ -219,7 +224,8 @@ class UserControllerTest {
             mockMvc.perform(put("/users/{id}/gender", ID)
                             .contentType(MediaType.APPLICATION_JSON)
                             .content("{}"))
-                    .andExpect(status().isBadRequest());
+                    .andExpect(status().isBadRequest())
+                    .andExpect(jsonPath("$.detail").value("gender must not be null"));
             verifyNoInteractions(userApplicationService);
         }
 
@@ -256,7 +262,7 @@ class UserControllerTest {
 
             mockMvc.perform(post("/users/{id}/deregister", ID))
                     .andExpect(status().isNotFound())
-                    .andExpect(jsonPath("$.detail").value(ErrorCode.USER_NOT_FOUND.clientMessage()));
+                    .andExpect(jsonPath("$.detail").value("用户不存在"));
         }
 
         @Test

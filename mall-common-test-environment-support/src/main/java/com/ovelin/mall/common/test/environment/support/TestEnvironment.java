@@ -27,8 +27,6 @@ public final class TestEnvironment {
             String currentHash = hashDirectory(dockerDirectory);
             if (Files.isRegularFile(hashFile)
                     && currentHash.equals(Files.readString(hashFile, StandardCharsets.UTF_8).trim())) {
-                LOGGER.log(System.Logger.Level.INFO,
-                        "Docker test environment is unchanged (SHA-256: {0}); skipping setup.", currentHash);
                 return;
             }
 

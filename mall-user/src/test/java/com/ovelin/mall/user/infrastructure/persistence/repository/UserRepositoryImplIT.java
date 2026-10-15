@@ -1,13 +1,12 @@
 package com.ovelin.mall.user.infrastructure.persistence.repository;
 
-import com.ovelin.mall.common.mybatis.plus.kernal.OvelinMybatisPlusAutoConfiguration;
 import com.ovelin.mall.common.mybatis.plus.kernal.SqlCollectingInterceptor;
 import com.ovelin.mall.common.mybatis.plus.kernal.SqlTestConfiguration;
 import com.ovelin.mall.common.sharding.core.ov.ShardedId;
 import com.ovelin.mall.user.TestApplication;
-import com.ovelin.mall.user.domain.exception.ErrorCode;
+import com.ovelin.mall.user.domain.exception.face.UserErrorCode;
 import com.ovelin.mall.user.domain.exception.InvalidUserStatusException;
-import com.ovelin.mall.user.domain.exception.UserDomainException;
+import com.ovelin.mall.user.domain.exception.face.UserDomainException;
 import com.ovelin.mall.user.domain.exception.UserNotFoundException;
 import com.ovelin.mall.user.domain.model.aggregate.User;
 import com.ovelin.mall.user.domain.model.enums.Gender;
@@ -321,7 +320,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
             copyB.changeDisplayName(name("from-b"));
             var e = assertThatThrownBy(() -> userRepository.update(copyB));
                     e.isInstanceOf(UserDomainException.class)
-                    .extracting("errorCode").isEqualTo(ErrorCode.CONCURRENT_UPDATE);
+                    .extracting("errorCode").isEqualTo(UserErrorCode.USER_CONCURRENT_UPDATE);
 
             User loaded = userRepository.findById(saved.getId());
             assertThat(loaded).isNotNull();

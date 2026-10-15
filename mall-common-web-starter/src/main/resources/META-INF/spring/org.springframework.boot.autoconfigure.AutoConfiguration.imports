@@ -1,3 +1,4 @@
 com.ovelin.mall.common.web.starter.LongToStringJacksonAutoConfiguration
 com.ovelin.mall.common.web.starter.GlobalExceptionHandlerAutoConfiguration
+com.ovelin.mall.common.web.starter.GlobalDomainExceptionHandlerAutoConfiguration
 com.ovelin.mall.common.web.starter.RequestIdFilterAutoConfiguration

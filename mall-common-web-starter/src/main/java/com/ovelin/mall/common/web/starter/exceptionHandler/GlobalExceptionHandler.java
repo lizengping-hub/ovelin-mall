@@ -1,18 +1,26 @@
 package com.ovelin.mall.common.web.starter.exceptionHandler;
 
 
+import com.ovelin.mall.common.exception.DomainException;
 import jakarta.annotation.Nullable;
 import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletResponse;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.context.i18n.LocaleContextHolder;
 import org.springframework.http.*;
+import org.springframework.web.ErrorResponse;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.context.request.ServletWebRequest;
 import org.springframework.web.context.request.WebRequest;
 import org.springframework.web.servlet.mvc.method.annotation.ResponseEntityExceptionHandler;
+import org.springframework.web.util.WebUtils;
 
 import java.util.stream.Collectors;
+
+import static com.ovelin.mall.common.web.starter.exceptionHandler.DomainExceptionLogger.logByStatus;
 
 @RestControllerAdvice
 public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
@@ -24,9 +32,10 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
      */
     @ExceptionHandler(Exception.class)
     public ResponseEntity<ProblemDetail> handleUnexpected(Exception e, HttpServletRequest req) {
-        log.error("Unhandled exception: {} {}", req.getMethod(), req.getRequestURI(), e);
-        return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                .body(ProblemBody.problem(HttpStatus.INTERNAL_SERVER_ERROR, "INTERNAL_ERROR", detailOf(HttpStatus.INTERNAL_SERVER_ERROR)));
+        HttpStatus status = HttpStatus.INTERNAL_SERVER_ERROR;
+        logByStatus(log, status, e, "INTERNAL_ERROR", req);
+        return ResponseEntity.status(status)
+                .body(ProblemBody.problem(status, "INTERNAL_ERROR", detailOf(status)));
     }
 
     /**
@@ -56,28 +65,39 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
     protected @Nullable ResponseEntity<Object> handleExceptionInternal(
             Exception ex, @Nullable Object body, HttpHeaders headers,
             HttpStatusCode status, WebRequest request) {
-
-        if (status.is5xxServerError()) {
-            log.error("{} -> {}", request.getDescription(false), status.value(), ex);
-        } else {
-            log.warn("{} -> {}: {}", request.getDescription(false), status.value(), ex.getMessage());
+        if (request instanceof ServletWebRequest servletWebRequest) {
+            HttpServletResponse response = servletWebRequest.getResponse();
+            if (response != null && response.isCommitted()) {
+                if (logger.isWarnEnabled()) {
+                    logger.warn("Response already committed. Ignoring: " + ex);
+                }
+                return null;
+            }
         }
-        return super.handleExceptionInternal(ex, body, headers, status, request);
-    }
 
-    @Override
-    protected ResponseEntity<Object> createResponseEntity(
-            @Nullable Object body, HttpHeaders headers, HttpStatusCode status, WebRequest request) {
-
+        if (body == null && ex instanceof ErrorResponse errorResponse) {
+            body = errorResponse.updateAndGetBody(super.getMessageSource(), LocaleContextHolder.getLocale());
+        }
+        if (status.equals(HttpStatus.INTERNAL_SERVER_ERROR) && body == null) {
+            request.setAttribute(WebUtils.ERROR_EXCEPTION_ATTRIBUTE, ex, WebRequest.SCOPE_REQUEST);
+        }
+        String code = codeOf(status);
         if (body instanceof ProblemDetail pd) {
             if (pd.getProperties() == null || !pd.getProperties().containsKey("code")) {
-                pd.setProperty("code", codeOf(status));
+                pd.setProperty("code", code);
             }
-
-        } else {
-            body = ProblemBody.problem(status, codeOf(status), detailOf(status));
         }
-        return super.createResponseEntity(body, headers, status, request);
+        if (body == null){
+            body = ProblemBody.problem(status, code, detailOf(status));
+        }
+
+        if (request instanceof ServletWebRequest servletWebRequest) {
+            HttpServletRequest httpRequest = servletWebRequest.getRequest();
+            logByStatus(log, status, ex, code, httpRequest);
+        } else {
+            logByStatus(log, status, ex, code, request);
+        }
+        return createResponseEntity(body, headers, status, request);
     }
 
     private static String codeOf(HttpStatusCode status) {
@@ -89,4 +109,5 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
             default -> null;
         };
     }
+
 }

@@ -1,5 +1,6 @@
 package com.ovelin.mall.common.web.starter.exceptionHandler;
 
+import com.ovelin.mall.common.exception.global.face.GlobalErrorCode;
 import com.ovelin.mall.common.web.starter.TestApp;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
@@ -115,6 +116,24 @@ class GlobalExceptionHandlerTest {
                     .andExpect(status().isConflict())
                     .andExpect(jsonPath("$.code").value("CONFLICT"));
         }
+
+        @Test
+        @DisplayName("GlobalDomainExceptionHandler 优先于兜底")
+        void invalidArgument() throws Exception {
+            mockMvc.perform(get("/probe/exception/domain/global"))
+                    .andExpect(status().isBadRequest())
+                    .andExpect(jsonPath("$.code").value(GlobalErrorCode.INVALID_ARGUMENT.name()))
+                    .andExpect(jsonPath("$.detail").value("test invalid argument exception message"));
+        }
+        @Test
+        @DisplayName("GlobalDomainExceptionHandler 优先于兜底拦截所有DomainException")
+        void businessDomainException() throws Exception {
+            mockMvc.perform(get("/probe/business/demain/exception"))
+                    .andExpect(status().isInternalServerError())
+                    .andExpect(jsonPath("$.code").value("BUSINESS_DOMAIN_EXCEPTION"))
+                    .andExpect(jsonPath("$.detail").value("服务器内部错误"));
+        }
+
     }
 
     @Nested

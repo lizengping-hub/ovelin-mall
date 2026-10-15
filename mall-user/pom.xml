@@ -79,6 +79,10 @@
             <groupId>com.ovelin</groupId>
             <artifactId>mall-common-web-starter</artifactId>
         </dependency>
+        <dependency>
+            <groupId>com.ovelin</groupId>
+            <artifactId>mall-common-exception</artifactId>
+        </dependency>
     </dependencies>
 
 </project>

@@ -1,5 +1,7 @@
 package com.ovelin.mall.common.web.starter.exceptionHandler;
 
+import com.ovelin.mall.common.exception.DomainException;
+import com.ovelin.mall.common.exception.global.InvalidArgumentException;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotBlank;
@@ -14,6 +16,9 @@ public class ProbeController {
 
     public static class BusinessConflictException extends RuntimeException {
         public BusinessConflictException() { super("conflict, internal detail 42"); }
+    }
+    public static class BusinessDomainException extends DomainException {
+        public BusinessDomainException() { super(()->"BUSINESS_DOMAIN_EXCEPTION","test business domain exception message"); }
     }
 
     @GetMapping("/items/{id}")
@@ -33,4 +38,10 @@ public class ProbeController {
 
     @GetMapping("/conflict")
     public void conflict() { throw new BusinessConflictException(); }
+
+    @GetMapping("/business/demain/exception")
+    public void businessDomainException() { throw new BusinessDomainException(); }
+
+    @GetMapping("/exception/domain/global")
+    public void globalDomainException() { throw new InvalidArgumentException("test invalid argument exception message"); }
 }

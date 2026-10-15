@@ -1,7 +1,6 @@
 package com.ovelin.mall.user.domain.model.enums;
 
-
-import com.ovelin.mall.user.domain.exception.InvalidArgumentException;
+import com.ovelin.mall.common.exception.global.InvalidArgumentException;
 import lombok.Getter;
 
 import java.util.Objects;
