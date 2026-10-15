@@ -2,6 +2,7 @@ package com.ovelin.mall.auth.infrastructure.persistence.convertor;
 
 import com.ovelin.mall.auth.domain.model.aggregate.UserPassword;
 import com.ovelin.mall.auth.infrastructure.persistence.po.UserPasswordPO;
+import com.ovelin.mall.common.sharding.core.ov.ShardedId;
 
 public final class UserPasswordPOConverter {
 
@@ -9,14 +10,14 @@ public final class UserPasswordPOConverter {
     }
 
     public static UserPassword toDomain(UserPasswordPO po) {
-        return UserPassword.restore(
-                po.getUserId(), po.getPasswordHash(), po.getPasswordChangedAt(),
+        return UserPassword.reconstitute(
+                ShardedId.fromId(po.getUserId()), po.getPasswordHash(), po.getPasswordChangedAt(),
                 po.getFailedAttempts(), po.getLockedUntil());
     }
 
     public static UserPasswordPO toPO(UserPassword password) {
         UserPasswordPO po = new UserPasswordPO();
-        po.setUserId(password.getUserId());
+        po.setUserId(password.getUserId().value());
         po.setPasswordHash(password.getPasswordHash());
         po.setPasswordChangedAt(password.getPasswordChangedAt());
         po.setFailedAttempts(password.getFailedAttempts());

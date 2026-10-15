@@ -4,6 +4,7 @@ import com.ovelin.mall.auth.domain.model.aggregate.UserIdentity;
 import com.ovelin.mall.auth.domain.model.enums.IdentityType;
 import com.ovelin.mall.auth.infrastructure.persistence.po.IdentityLookupPO;
 import com.ovelin.mall.auth.infrastructure.persistence.po.UserIdentityPO;
+import com.ovelin.mall.common.sharding.core.ov.ShardedId;
 
 public final class UserIdentityPOConverter {
 
@@ -11,19 +12,18 @@ public final class UserIdentityPOConverter {
     }
 
     public static UserIdentity toDomain(UserIdentityPO po) {
-        return UserIdentity.restore(
-                po.getId(), po.getUserId(), IdentityType.fromCode(po.getIdentityType()),
-                po.getIdentifier(), Boolean.TRUE.equals(po.getPrimary()),
-                po.getVerifiedAt(), po.getLastLoginAt());
+        return UserIdentity.reconstitute(
+                ShardedId.fromId(po.getId()), ShardedId.fromId(po.getUserId()),
+                po.getIdentityType(), po.getIdentifier(),
+               po.getVerifiedAt(), po.getLastLoginAt());
     }
 
     public static UserIdentityPO toPO(UserIdentity identity) {
         UserIdentityPO po = new UserIdentityPO();
-        po.setId(identity.getId());
-        po.setUserId(identity.getUserId());
+        po.setId(identity.getId().value());
+        po.setUserId(identity.getUserId().value());
         po.setIdentityType(identity.getType().getCode());
         po.setIdentifier(identity.getIdentifier());
-        po.setPrimary(identity.isPrimary());
         po.setVerifiedAt(identity.getVerifiedAt());
         po.setLastLoginAt(identity.getLastLoginAt());
         return po;
@@ -33,7 +33,7 @@ public final class UserIdentityPOConverter {
         IdentityLookupPO po = new IdentityLookupPO();
         po.setIdentityType(identity.getType().getCode());
         po.setIdentifier(identity.getIdentifier());
-        po.setUserId(identity.getUserId());
+        po.setUserId(identity.getUserId().value());
         return po;
     }
 }
