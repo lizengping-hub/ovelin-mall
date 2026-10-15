@@ -1,6 +1,7 @@
 package com.ovelin.mall.auth.domain.model.valueobject;
 
 
+import com.ovelin.mall.common.exception.global.InvalidArgumentException;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.params.ParameterizedTest;
@@ -19,7 +20,7 @@ public class EmailTest {
         @ParameterizedTest
         @ValueSource(strings = {"andy@","andy@q","andy@.q","andy@b.","andy@b.q","andy@b.q0","andy@.qq","andy@b.1q"})
         void shouldThrowException(String email){
-            assertThatThrownBy(()->Email.from(email)).isInstanceOf(IllegalArgumentException.class);
+            assertThatThrownBy(()-> Email.from(email)).isInstanceOf(InvalidArgumentException.class);
         }
     }
     @Nested
