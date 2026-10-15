@@ -1,5 +1,6 @@
 package com.ovelin.mall.auth.domain.model.enums;
 
+import com.ovelin.mall.common.exception.global.InvalidArgumentException;
 import lombok.Getter;
 import lombok.RequiredArgsConstructor;
 
@@ -20,7 +21,7 @@ public enum MfaFactorType {
                 return type;
             }
         }
-        throw new IllegalArgumentException("未知的二次验证类型: " + code);
+        throw new InvalidArgumentException("未知的二次验证类型: " + code);
     }
 
     /** 短信、邮箱因子引用 user_identity，不自己存密钥 */

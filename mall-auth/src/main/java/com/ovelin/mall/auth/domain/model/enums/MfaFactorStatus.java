@@ -1,5 +1,6 @@
 package com.ovelin.mall.auth.domain.model.enums;
 
+import com.ovelin.mall.common.exception.global.InvalidArgumentException;
 import lombok.Getter;
 import lombok.RequiredArgsConstructor;
 
@@ -18,6 +19,6 @@ public enum MfaFactorStatus {
                 return status;
             }
         }
-        throw new IllegalArgumentException("未知的因子状态: " + code);
+        throw new InvalidArgumentException("未知的因子状态: " + code);
     }
 }

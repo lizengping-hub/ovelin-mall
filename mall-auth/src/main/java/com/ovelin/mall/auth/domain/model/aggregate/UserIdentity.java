@@ -1,71 +1,92 @@
 package com.ovelin.mall.auth.domain.model.aggregate;
 
 import com.ovelin.mall.auth.domain.model.enums.IdentityType;
+import com.ovelin.mall.auth.domain.model.identityIdentifier.IdentityIdentifier;
+import com.ovelin.mall.auth.domain.model.identityIdentifier.IdentityIdentifierFactory;
+import com.ovelin.mall.common.exception.global.InvalidArgumentException;
+import com.ovelin.mall.common.sharding.core.ov.ShardedId;
 import lombok.Getter;
 
 import java.time.Instant;
+import java.util.Objects;
 
+/**
+ * 登录身份：LoginAccount 聚合内的实体。
+ * 创建与状态修改方法均为包级可见，外部只能通过 {@link LoginAccount} 操作；
+ * 修改方法返回"是否发生变化"，供聚合根决定是否记入变更集。
+ */
 @Getter
 public class UserIdentity {
 
-    private final long id;
-    private final long userId;
-    private final IdentityType type;
-    private final String identifier;
-    private boolean primary;
+    private final ShardedId id;
+    private final ShardedId userId;
+    private final IdentityIdentifier identityIdentifier;
     private Instant verifiedAt;
     private Instant lastLoginAt;
 
-    private UserIdentity(long id, long userId, IdentityType type, String identifier,
-                         boolean primary, Instant verifiedAt, Instant lastLoginAt) {
+    private UserIdentity(ShardedId id, ShardedId userId, IdentityIdentifier identityIdentifier,
+                         Instant verifiedAt, Instant lastLoginAt) {
         this.id = id;
         this.userId = userId;
-        this.type = type;
-        this.identifier = identifier;
-        this.primary = primary;
+        this.identityIdentifier = identityIdentifier;
         this.verifiedAt = verifiedAt;
         this.lastLoginAt = lastLoginAt;
     }
 
-    public static UserIdentity register(long id, long userId, IdentityType type, String rawIdentifier,
-                                        boolean primary) {
-        String identifier = type.normalize(rawIdentifier);
-        if (identifier.isEmpty()) {
-            throw new IllegalArgumentException("登录标识不能为空");
+    static UserIdentity register(
+            ShardedId id,
+            ShardedId userId,
+            IdentityIdentifier identityIdentifier) {
+
+        Objects.requireNonNull(id, "id 不能为空");
+        Objects.requireNonNull(userId, "userId 不能为空");
+        Objects.requireNonNull(identityIdentifier, "identityIdentifier 不能为空");
+
+        if (!id.shardId().equals(userId.shardId())) {
+            throw new InvalidArgumentException("身份记录必须与用户落在同一分片");
         }
-        return new UserIdentity(id, userId, type, identifier, primary, null, null);
+
+        return new UserIdentity(id, userId, identityIdentifier, null, null);
     }
 
     /** 仅供持久化层还原，不做标准化和校验 */
-    public static UserIdentity restore(long id, long userId, IdentityType type, String identifier,
-                                       boolean primary, Instant verifiedAt, Instant lastLoginAt) {
-        return new UserIdentity(id, userId, type, identifier, primary, verifiedAt, lastLoginAt);
+    public static UserIdentity reconstitute(ShardedId id, ShardedId userId, String type,
+                                            String identifier,
+                                            Instant verifiedAt, Instant lastLoginAt) {
+        return new UserIdentity(id, userId, IdentityIdentifierFactory.reconstitute(type, identifier), verifiedAt, lastLoginAt);
     }
 
-    public void markVerified(Instant at) {
-        if (verifiedAt == null) {
-            verifiedAt = at;
+    /** @return 是否发生变化（已验证过则不变） */
+    boolean markVerified(Instant at) {
+        if (verifiedAt != null) {
+            return false;
         }
+        verifiedAt = at;
+        return true;
     }
 
-    public void recordLogin(Instant at) {
+    void recordLogin(Instant at) {
         this.lastLoginAt = at;
     }
 
-    public void markPrimary() {
-        this.primary = true;
-    }
-
-    public void unmarkPrimary() {
-        this.primary = false;
+    boolean matches(IdentityIdentifier identityIdentifier) {
+        return this.identityIdentifier.equals(identityIdentifier);
     }
 
     public boolean isVerified() {
         return verifiedAt != null;
     }
 
-    /** 能否用来收二次验证码：必须是手机/邮箱且已验证 */
     public boolean canReceiveCode() {
-        return type.canReceiveCode() && isVerified();
+        return identityIdentifier.type().canReceiveCode() && isVerified();
     }
+
+    public IdentityType getType(){
+        return this.identityIdentifier.type();
+    }
+    public String getIdentifier(){
+        return identityIdentifier.value();
+    }
+
+
 }

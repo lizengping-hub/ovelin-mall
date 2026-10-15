@@ -1,5 +1,6 @@
 package com.ovelin.mall.auth.domain.model.enums;
 
+import com.ovelin.mall.common.exception.global.InvalidArgumentException;
 import lombok.Getter;
 import lombok.RequiredArgsConstructor;
 
@@ -10,7 +11,8 @@ import java.util.Locale;
 public enum IdentityType {
     USERNAME("username"),
     PHONE("phone"),
-    EMAIL("email");
+    EMAIL("email"),
+    OAUTH("oauth");
 
     private final String code;
 
@@ -20,7 +22,7 @@ public enum IdentityType {
                 return type;
             }
         }
-        throw new IllegalArgumentException("未知的身份类型: " + code);
+        throw new InvalidArgumentException("未知的身份类型: " + code);
     }
 
     /** 标准化登录标识：去首尾空白，邮箱和用户名统一小写。手机号的国家码规范化应在入口处理好再传进来。 */

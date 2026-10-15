@@ -1,6 +1,7 @@
 package com.ovelin.mall.auth.domain.model.valueobject;
 
 
+import com.ovelin.mall.common.exception.global.InvalidArgumentException;
 import lombok.Getter;
 
 import java.util.regex.Pattern;
@@ -29,21 +30,21 @@ public class Email {
     }
     private static String validate(String value) {
         if (value == null || value.isBlank()) {
-            throw new IllegalArgumentException("Email cannot be null or blank");
+            throw new InvalidArgumentException("Email cannot be null or blank");
         }
         value = value.trim();
         if (value.length() > MAX_LENGTH) {
-            throw new IllegalArgumentException("Email too long (max " + MAX_LENGTH + " chars)");
+            throw new InvalidArgumentException("Email too long (max " + MAX_LENGTH + " chars)");
         }
         if (!EMAIL_PATTERN.matcher(value).matches()) {
-            throw new IllegalArgumentException("Invalid email format: " + value);
+            throw new InvalidArgumentException("Invalid email format: " + value);
         }
         // 建议统一转小写存储，避免 Foo@Bar.com 和 foo@bar.com 被当成两个不同用户
         return value.toLowerCase();
     }
     public static Email reconstitute(String value) {
         if (value == null || value.isBlank()) {
-            throw new IllegalArgumentException("Email cannot be null or blank");
+            throw new InvalidArgumentException("Email cannot be null or blank");
         }
         return new Email(value);
     }
