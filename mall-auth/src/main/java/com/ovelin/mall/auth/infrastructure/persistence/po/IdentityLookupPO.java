@@ -20,6 +20,8 @@ public class IdentityLookupPO {
 
     private Long userId;
 
+    private int status;
+
     @TableField(insertStrategy = FieldStrategy.NEVER, updateStrategy = FieldStrategy.NEVER)
     private Instant createdAt;
 }

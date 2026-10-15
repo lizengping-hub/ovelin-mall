@@ -20,9 +20,6 @@ public class UserIdentityPO {
 
     private String identifier;
 
-    @TableField("is_primary")
-    private Boolean primary;
-
     private Instant verifiedAt;
 
     private Instant lastLoginAt;

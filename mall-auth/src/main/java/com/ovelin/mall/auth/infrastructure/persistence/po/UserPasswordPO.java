@@ -18,8 +18,9 @@ public class UserPasswordPO {
 
     private Instant passwordChangedAt;
 
-    private Integer failedAttempts;
+    private int failedAttempts;
 
+    @TableField(updateStrategy=FieldStrategy.ALWAYS)
     private Instant lockedUntil;
 
     @TableField(insertStrategy = FieldStrategy.NEVER, updateStrategy = FieldStrategy.NEVER)
