@@ -72,8 +72,8 @@ class ShardedIdTest {
         ShardedId a = ShardedId.of(shardId, 22222222);
         ShardedId b = ShardedId.of(shardId, 33333333);
 
-        assertTrue(a.shardEquals(shardId));
-        assertTrue(a.shardEquals(b));
+        assertTrue(a.hasSameShard(shardId));
+        assertTrue(a.hasSameShard(b));
     }
 
     @Test
@@ -81,7 +81,7 @@ class ShardedIdTest {
         ShardedId a = ShardedId.of(123, 22222222);
         ShardedId b = ShardedId.of(456, 33333333);
 
-        assertFalse(a.shardEquals(ShardId.of(456)));
-        assertFalse(a.shardEquals(b));
+        assertFalse(a.hasSameShard(ShardId.of(456)));
+        assertFalse(a.hasSameShard(b));
     }
 }

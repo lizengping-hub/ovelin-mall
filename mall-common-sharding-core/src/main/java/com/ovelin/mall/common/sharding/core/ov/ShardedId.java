@@ -29,10 +29,10 @@ public final class ShardedId implements Identifier {
         }
     }
 
-    public boolean shardEquals(ShardId shardId){
+    public boolean hasSameShard(ShardId shardId){
         return this.shardId().equals(shardId);
     }
-    public boolean shardEquals(ShardedId shardId){
+    public boolean hasSameShard(ShardedId shardId){
         return (this.id & IdLayout.SHARD_MASK) == (shardId.id & IdLayout.SHARD_MASK);
     }
 
