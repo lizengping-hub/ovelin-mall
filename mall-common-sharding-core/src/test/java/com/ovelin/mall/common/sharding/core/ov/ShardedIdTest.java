@@ -66,4 +66,22 @@ class ShardedIdTest {
         assertEquals("0x" + Long.toHexString(ShardedId.fromId(255L).value()),
                 ShardedId.fromId(255L).toString());
     }
+    @Test
+    void shardIdShouldEquals(){
+        ShardId shardId = ShardId.of(12345);
+        ShardedId a = ShardedId.of(shardId, 22222222);
+        ShardedId b = ShardedId.of(shardId, 33333333);
+
+        assertTrue(a.shardEquals(shardId));
+        assertTrue(a.shardEquals(b));
+    }
+
+    @Test
+    void shardIdShouldNotEquals(){
+        ShardedId a = ShardedId.of(123, 22222222);
+        ShardedId b = ShardedId.of(456, 33333333);
+
+        assertFalse(a.shardEquals(ShardId.of(456)));
+        assertFalse(a.shardEquals(b));
+    }
 }

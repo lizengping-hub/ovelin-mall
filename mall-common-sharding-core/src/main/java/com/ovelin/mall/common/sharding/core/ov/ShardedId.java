@@ -29,6 +29,14 @@ public final class ShardedId implements Identifier {
         }
     }
 
+    public boolean shardEquals(ShardId shardId){
+        return this.shardId().equals(shardId);
+    }
+    public boolean shardEquals(ShardedId shardId){
+        return (this.id & IdLayout.SHARD_MASK) == (shardId.id & IdLayout.SHARD_MASK);
+    }
+
+
     public ShardId shardId() { return new ShardId(shardOf(id)); }
     public long sequence()   { return id & IdLayout.MAX_SEQUENCE; }
     public long value()      { return id; }

@@ -5,6 +5,7 @@ final class IdLayout {
     static final int SEQUENCE_BITS = 48;
     static final int SHARD_CAPACITY = 1 << SHARD_BITS;
     static final int MAX_SHARD = SHARD_CAPACITY - 1;
+    static final long SHARD_MASK = (long)MAX_SHARD << SEQUENCE_BITS;
     static final long MAX_SEQUENCE = (1L << SEQUENCE_BITS) - 1;
     private IdLayout() {}
 
