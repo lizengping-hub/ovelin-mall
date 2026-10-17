@@ -24,4 +24,7 @@ public class IdentityLookupPO {
 
     @TableField(insertStrategy = FieldStrategy.NEVER, updateStrategy = FieldStrategy.NEVER)
     private Instant createdAt;
+
+    @TableField(insertStrategy = FieldStrategy.NEVER, updateStrategy = FieldStrategy.NEVER)
+    private Instant updatedAt;
 }

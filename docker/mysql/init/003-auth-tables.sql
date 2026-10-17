@@ -35,7 +35,6 @@ BEGIN
                 'user_id BIGINT NOT NULL COMMENT ''用户ID'',',
                 'identity_type VARCHAR(20) NOT NULL COMMENT ''username / phone / email'',',
                 'identifier VARCHAR(255) NOT NULL COMMENT ''标准化登录标识'',',
-                'is_primary TINYINT NOT NULL DEFAULT 0,',
                 'verified_at TIMESTAMP(3) NULL,',
                 'last_login_at TIMESTAMP(3) NULL,',
                 'created_at TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),',
@@ -58,7 +57,9 @@ BEGIN
                         'identity_type VARCHAR(20) NOT NULL COMMENT ''username / phone / email'',',
                         'identifier VARCHAR(255) NOT NULL COMMENT ''标准化登录标识'',',
                         'user_id BIGINT NOT NULL COMMENT ''用户ID'',',
+                        'status TINYINT NOT NULL COMMENT ''0 reserved;1 active; 2 releasing'','
                         'created_at TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),',
+                        'updated_at  TIMESTAMP(3)  NOT NULL DEFAULT CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3) COMMENT ''更新时间'',',
                         'PRIMARY KEY (identity_type, identifier)',
                         ') ENGINE = InnoDB
                               DEFAULT CHARSET = utf8mb4

@@ -23,7 +23,7 @@ class IdentityLookupMapperIT extends AuthIntegrationTestSupport {
         ShardedId userId = newId("user", 0);
         mapper.insert(lookup("phone", "13900000001", userId));
 
-        IdentityLookupPO actual = mapper.selectByTypeAndIdentifier("phone", "13900000001");
+        IdentityLookupPO actual = mapper.selectByIdentifier("phone", "13900000001");
 
         assertThat(actual).isNotNull();
         assertThat(actual.getUserId()).isEqualTo(userId.value());
@@ -33,7 +33,7 @@ class IdentityLookupMapperIT extends AuthIntegrationTestSupport {
     @Test
     @DisplayName("查不存在的标识返回null")
     void queryNonExistentIdentifierReturnsNull() {
-        assertThat(mapper.selectByTypeAndIdentifier("phone", "13900000002")).isNull();
+        assertThat(mapper.selectByIdentifier("phone", "13900000002")).isNull();
     }
 
     @Test
@@ -44,8 +44,8 @@ class IdentityLookupMapperIT extends AuthIntegrationTestSupport {
         mapper.insert(lookup("username", "alice", user1));
         mapper.insert(lookup("email", "alice", user2));
 
-        assertThat(mapper.selectByTypeAndIdentifier("username", "alice").getUserId()).isEqualTo(user1.value());
-        assertThat(mapper.selectByTypeAndIdentifier("email", "alice").getUserId()).isEqualTo(user2.value());
+        assertThat(mapper.selectByIdentifier("username", "alice").getUserId()).isEqualTo(user1.value());
+        assertThat(mapper.selectByIdentifier("email", "alice").getUserId()).isEqualTo(user2.value());
     }
 
     @Test
@@ -63,17 +63,17 @@ class IdentityLookupMapperIT extends AuthIntegrationTestSupport {
     void canReclaimAfterDeletion() {
         mapper.insert(lookup("phone", "13900000004", newId("user", 0)));
 
-        int deleted = mapper.deleteByTypeAndIdentifier("phone", "13900000004");
+        int deleted = mapper.deleteByIdentifier("phone", "13900000004");
 
         assertThat(deleted).isEqualTo(1);
-        assertThat(mapper.selectByTypeAndIdentifier("phone", "13900000004")).isNull();
+        assertThat(mapper.selectByIdentifier("phone", "13900000004")).isNull();
         mapper.insert(lookup("phone", "13900000004", newId("user", 1)));
     }
 
     @Test
     @DisplayName("删除不存在的标识返回0")
     void deleteNonExistentIdentifierReturnsZero() {
-        assertThat(mapper.deleteByTypeAndIdentifier("phone", "13900000005")).isZero();
+        assertThat(mapper.deleteByIdentifier("phone", "13900000005")).isZero();
     }
 
     private static IdentityLookupPO lookup(String type, String identifier, ShardedId userId) {

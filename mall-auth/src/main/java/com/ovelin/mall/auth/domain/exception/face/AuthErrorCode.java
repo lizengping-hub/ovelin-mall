@@ -4,6 +4,8 @@ import com.ovelin.mall.common.exception.ErrorCode;
 
 public enum AuthErrorCode implements ErrorCode {
     IDENTIFIER_ALREADY_TAKEN,
-    INVALID_ACCOUNT_STATUS,
+    ACCOUNT_LOCKED,
+    ACCOUNT_NOT_FOUND,
     AUTHENTICATION_FAILED
+
 }
