@@ -43,7 +43,7 @@ public final class ShardedId implements Identifier {
     @Override
     public int hashCode() { return Long.hashCode(id); }
     @Override
-    public String toString() { return toHexString(); }
+    public String toString() { return String.valueOf(id); }
     public String toHexString() { return "0x"+Long.toHexString(id); }
     @Override
     public boolean equals(Object obj) {
