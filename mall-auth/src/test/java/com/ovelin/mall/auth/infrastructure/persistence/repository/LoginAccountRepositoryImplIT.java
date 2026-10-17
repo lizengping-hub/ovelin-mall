@@ -64,7 +64,7 @@ class LoginAccountRepositoryImplIT extends AuthIntegrationTestSupport {
         ShardedId userId = newId("user", SHARD);
         ShardedId identityId = newId("user_identity", SHARD);
         LoginAccount account = LoginAccount.open(userId, identityId, PHONE_IDENTITY_IDENTIFIER);
-        repository.save(account);
+        repository.update(account);
 
         Optional<LoginAccount> loaded = repository.findByUserId(userId);
 
@@ -93,7 +93,7 @@ class LoginAccountRepositoryImplIT extends AuthIntegrationTestSupport {
         account.verifyIdentity(emailId, now());
         MfaFactor factor = account.addIdentityFactor(factorId, phoneId);
         account.enableFactor(factor.getId(), now());
-        repository.save(account);
+        repository.update(account);
 
         LoginAccount loaded = repository.findByUserId(userId).orElseThrow();
         assertThat(loaded.getIdentities()).hasSize(2);
@@ -109,7 +109,7 @@ class LoginAccountRepositoryImplIT extends AuthIntegrationTestSupport {
         ShardedId userId = newId("user", SHARD);
         ShardedId identityId = newId("user_identity", SHARD);
         LoginAccount account = LoginAccount.open(userId, identityId, PHONE_IDENTITY_IDENTIFIER);
-        repository.save(account);
+        repository.update(account);
 
         Optional<ShardedId> found = repository.findUserIdByIdentity(PHONE_IDENTITY_IDENTIFIER);
 
@@ -125,11 +125,11 @@ class LoginAccountRepositoryImplIT extends AuthIntegrationTestSupport {
 
         LoginAccount account = LoginAccount.open(userId, phoneId, PHONE_IDENTITY_IDENTIFIER);
         account.bindIdentity(emailId, EMAIL_IDENTITY_IDENTIFIER);
-        repository.save(account);
+        repository.update(account);
 
         LoginAccount loaded = repository.findByUserId(userId).orElseThrow();
         loaded.unbindIdentity(phoneId);
-        repository.save(loaded);
+        repository.update(loaded);
 
         assertThat(repository.findUserIdByIdentity(PHONE_IDENTITY_IDENTIFIER)).isEmpty();
         assertThat(repository.findUserIdByIdentity(EMAIL_IDENTITY_IDENTIFIER)).contains(userId);
@@ -143,8 +143,8 @@ class LoginAccountRepositoryImplIT extends AuthIntegrationTestSupport {
         ShardedId userId = newId("user", SHARD);
         ShardedId identityId = newId("user_identity", SHARD);
         LoginAccount account = LoginAccount.open(userId, identityId, PHONE_IDENTITY_IDENTIFIER);
-        repository.save(account);
-        repository.save(account); // 变更集已清空，应为 no-op
+        repository.update(account);
+        repository.update(account); // 变更集已清空，应为 no-op
 
         assertThat(repository.findByUserId(userId).orElseThrow().getIdentities()).hasSize(1);
     }
@@ -155,13 +155,13 @@ class LoginAccountRepositoryImplIT extends AuthIntegrationTestSupport {
         ShardedId userId1 = newId("user", SHARD);
         ShardedId identityId1 = newId("user_identity", SHARD);
         LoginAccount account1 = LoginAccount.open(userId1, identityId1, PHONE_IDENTITY_IDENTIFIER);
-        repository.save(account1);
+        repository.update(account1);
 
         ShardedId userId2 = newId("user", SHARD);
         ShardedId identityId2 = newId("user_identity", SHARD);
         LoginAccount account2 = LoginAccount.open(userId2, identityId2, PHONE_IDENTITY_IDENTIFIER);
 
-        assertThatThrownBy(() -> repository.save(account2))
+        assertThatThrownBy(() -> repository.update(account2))
                 .isInstanceOf(IdentifierAlreadyTakenException.class);
     }
 
@@ -173,12 +173,12 @@ class LoginAccountRepositoryImplIT extends AuthIntegrationTestSupport {
         ShardedId userId = newId("user", SHARD);
         ShardedId identityId = newId("user_identity", SHARD);
         LoginAccount account = LoginAccount.open(userId, identityId, PHONE_IDENTITY_IDENTIFIER);
-        repository.save(account);
+        repository.update(account);
 
         Instant verifiedAt = now();
         LoginAccount loaded = repository.findByUserId(userId).orElseThrow();
         loaded.verifyIdentity(identityId, verifiedAt);
-        repository.save(loaded);
+        repository.update(loaded);
 
         UserIdentity identity = repository.findByUserId(userId).orElseThrow()
                 .getIdentities().get(0);
@@ -191,12 +191,12 @@ class LoginAccountRepositoryImplIT extends AuthIntegrationTestSupport {
         ShardedId userId = newId("user", SHARD);
         ShardedId identityId = newId("user_identity", SHARD);
         LoginAccount account = LoginAccount.open(userId, identityId, PHONE_IDENTITY_IDENTIFIER);
-        repository.save(account);
+        repository.update(account);
 
         Instant loginAt = now();
         LoginAccount loaded = repository.findByUserId(userId).orElseThrow();
         loaded.recordLogin(identityId, loginAt);
-        repository.save(loaded);
+        repository.update(loaded);
 
         UserIdentity identity = repository.findByUserId(userId).orElseThrow()
                 .getIdentities().get(0);
@@ -213,11 +213,11 @@ class LoginAccountRepositoryImplIT extends AuthIntegrationTestSupport {
         ShardedId emailId = newId("user_identity", SHARD);
         LoginAccount account = LoginAccount.open(userId, phoneId, PHONE_IDENTITY_IDENTIFIER);
         account.bindIdentity(emailId, EMAIL_IDENTITY_IDENTIFIER);
-        repository.save(account);
+        repository.update(account);
 
         LoginAccount loaded = repository.findByUserId(userId).orElseThrow();
         loaded.unbindIdentity(phoneId);
-        repository.save(loaded);
+        repository.update(loaded);
 
         LoginAccount reloaded = repository.findByUserId(userId).orElseThrow();
         assertThat(reloaded.getIdentities()).hasSize(1);
@@ -238,11 +238,11 @@ class LoginAccountRepositoryImplIT extends AuthIntegrationTestSupport {
         account.bindIdentity(emailId, EMAIL_IDENTITY_IDENTIFIER);
         MfaFactor factor = account.addIdentityFactor(factorId, phoneId);
         account.enableFactor(factor.getId(), now());
-        repository.save(account);
+        repository.update(account);
 
         LoginAccount loaded = repository.findByUserId(userId).orElseThrow();
         loaded.unbindIdentity(phoneId);
-        repository.save(loaded);
+        repository.update(loaded);
 
         LoginAccount reloaded = repository.findByUserId(userId).orElseThrow();
         assertThat(reloaded.getFactors()).hasSize(1);
@@ -259,7 +259,7 @@ class LoginAccountRepositoryImplIT extends AuthIntegrationTestSupport {
         ShardedId factorId = newId("user_mfa_factor", SHARD);
         LoginAccount account = LoginAccount.open(userId, identityId, PHONE_IDENTITY_IDENTIFIER);
         account.addSecretFactor(factorId, MfaFactorType.TOTP, "encrypted-secret");
-        repository.save(account);
+        repository.update(account);
 
         LoginAccount loaded = repository.findByUserId(userId).orElseThrow();
         assertThat(loaded.getFactors()).hasSize(1);
@@ -279,12 +279,12 @@ class LoginAccountRepositoryImplIT extends AuthIntegrationTestSupport {
         LoginAccount account = LoginAccount.open(userId, phoneId, PHONE_IDENTITY_IDENTIFIER);
         account.verifyIdentity(phoneId, now());
         MfaFactor factor = account.addIdentityFactor(factorId, phoneId);
-        repository.save(account);
+        repository.update(account);
 
         Instant enabledAt = now();
         LoginAccount loaded = repository.findByUserId(userId).orElseThrow();
         loaded.enableFactor(factor.getId(), enabledAt);
-        repository.save(loaded);
+        repository.update(loaded);
 
         MfaFactor reloaded = repository.findByUserId(userId).orElseThrow()
                 .getFactors().get(0);
@@ -303,11 +303,11 @@ class LoginAccountRepositoryImplIT extends AuthIntegrationTestSupport {
         account.verifyIdentity(phoneId, now());
         MfaFactor factor = account.addIdentityFactor(factorId, phoneId);
         account.enableFactor(factor.getId(), now());
-        repository.save(account);
+        repository.update(account);
 
         LoginAccount loaded = repository.findByUserId(userId).orElseThrow();
         loaded.disableFactor(factor.getId());
-        repository.save(loaded);
+        repository.update(loaded);
 
         assertThat(repository.findByUserId(userId).orElseThrow()
                 .getFactors().get(0).getStatus())
@@ -325,12 +325,12 @@ class LoginAccountRepositoryImplIT extends AuthIntegrationTestSupport {
         account.verifyIdentity(phoneId, now());
         MfaFactor factor = account.addIdentityFactor(factorId, phoneId);
         account.enableFactor(factor.getId(), now());
-        repository.save(account);
+        repository.update(account);
 
         Instant usedAt = now();
         LoginAccount loaded = repository.findByUserId(userId).orElseThrow();
         loaded.recordFactorUsed(factor.getId(), usedAt);
-        repository.save(loaded);
+        repository.update(loaded);
 
         assertThat(repository.findByUserId(userId).orElseThrow()
                 .getFactors().get(0).getLastUsedAt())
@@ -345,11 +345,11 @@ class LoginAccountRepositoryImplIT extends AuthIntegrationTestSupport {
         ShardedId factorId = newId("user_mfa_factor", SHARD);
         LoginAccount account = LoginAccount.open(userId, identityId, PHONE_IDENTITY_IDENTIFIER);
         account.addSecretFactor(factorId, MfaFactorType.TOTP, "enc");
-        repository.save(account);
+        repository.update(account);
 
         LoginAccount loaded = repository.findByUserId(userId).orElseThrow();
         loaded.removeFactor(factorId);
-        repository.save(loaded);
+        repository.update(loaded);
 
         assertThat(repository.findByUserId(userId).orElseThrow().getFactors()).isEmpty();
     }
@@ -368,11 +368,11 @@ class LoginAccountRepositoryImplIT extends AuthIntegrationTestSupport {
         account.verifyIdentity(phoneId, now());
         account.bindIdentity(emailId, EMAIL_IDENTITY_IDENTIFIER);
         account.addSecretFactor(factorId, MfaFactorType.TOTP, "enc");
-        repository.save(account);
+        repository.update(account);
 
         LoginAccount loaded = repository.findByUserId(userId).orElseThrow();
         loaded.close();
-        repository.save(loaded);
+        repository.update(loaded);
 
         assertThat(repository.findByUserId(userId)).isEmpty();
         assertThat(repository.findUserIdByIdentity(PHONE_IDENTITY_IDENTIFIER)).isEmpty();
@@ -387,7 +387,7 @@ class LoginAccountRepositoryImplIT extends AuthIntegrationTestSupport {
         ShardedId userId = newId("user", SHARD);
         ShardedId identityId = newId("user_identity", SHARD);
         LoginAccount account = LoginAccount.open(userId, identityId, PHONE_IDENTITY_IDENTIFIER);
-        repository.save(account);
+        repository.update(account);
 
         assertThat(account.hasChanges()).isFalse();
     }

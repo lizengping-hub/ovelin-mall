@@ -1,7 +1,6 @@
 package com.ovelin.mall.auth.domain.repository;
 
 import com.ovelin.mall.auth.domain.model.aggregate.LoginAccount;
-import com.ovelin.mall.auth.domain.model.enums.IdentityType;
 import com.ovelin.mall.auth.domain.model.identityIdentifier.IdentityIdentifier;
 import com.ovelin.mall.common.sharding.core.ov.ShardedId;
 
@@ -20,9 +19,16 @@ public interface LoginAccountRepository {
     Optional<ShardedId> findUserIdByIdentity(IdentityIdentifier identityIdentifier);
 
     /**
-     * 保存聚合内的全部变更（新增 / 修改 / 删除的身份与因子），成功后清空聚合的变更集。
+     * 保存新增后的聚合内的全部变更（新增 / 修改 / 删除的身份与因子），成功后清空聚合的变更集。
      *
      * @throws com.ovelin.mall.auth.domain.exception.IdentifierAlreadyTakenException 新增的登录标识已被占用
      */
-    void save(LoginAccount account);
+    void update(LoginAccount account);
+
+    /**
+     * LogingAccount是新增时使用，新增聚合，与后续update分离可以减少一些复杂且不易实现的逻辑判断
+     *
+     */
+    void add(LoginAccount account);
+
 }

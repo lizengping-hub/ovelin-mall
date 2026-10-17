@@ -4,7 +4,6 @@ import com.baomidou.mybatisplus.core.toolkit.Wrappers;
 import com.ovelin.mall.auth.domain.model.aggregate.LoginAccount;
 import com.ovelin.mall.auth.domain.model.aggregate.MfaFactor;
 import com.ovelin.mall.auth.domain.model.aggregate.UserIdentity;
-import com.ovelin.mall.auth.domain.model.enums.IdentityType;
 import com.ovelin.mall.auth.domain.model.identityIdentifier.IdentityIdentifier;
 import com.ovelin.mall.auth.domain.repository.LoginAccountRepository;
 
@@ -17,6 +16,8 @@ import com.ovelin.mall.auth.infrastructure.persistence.mapper.UserIdentityMapper
 import com.ovelin.mall.auth.infrastructure.persistence.mapper.UserMfaFactorMapper;
 import com.ovelin.mall.auth.infrastructure.persistence.po.UserIdentityPO;
 import com.ovelin.mall.auth.infrastructure.persistence.po.UserMfaFactorPO;
+import com.ovelin.mall.common.sharding.core.api.ShardResolver;
+import com.ovelin.mall.common.sharding.core.ov.ShardId;
 import com.ovelin.mall.common.sharding.core.ov.ShardedId;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -49,10 +50,11 @@ public class LoginAccountRepositoryImpl implements LoginAccountRepository {
     private final UserMfaFactorMapper factorMapper;
     private final IdentityLookupGateway lookup;
     private final TransactionTemplate tx;
+    private final ShardResolver shardResolver;
 
     @Override
     public Optional<LoginAccount> findByUserId(ShardedId userId) {
-        Long uid = toLong(userId);
+        Long uid = userId.value();
         List<UserIdentity> identities = identityMapper.selectList(Wrappers.<UserIdentityPO>lambdaQuery()
                         .eq(UserIdentityPO::getUserId, uid))
                 .stream().map(UserIdentityPOConverter::toDomain).toList();
@@ -67,23 +69,87 @@ public class LoginAccountRepositoryImpl implements LoginAccountRepository {
 
     @Override
     public Optional<ShardedId> findUserIdByIdentity(IdentityIdentifier identityIdentifier) {
-        return lookup.findUserId(identityIdentifier.type(), identityIdentifier.value());
+        return lookup.findUserId(identityIdentifier);
+    }
+
+    /**
+     * 仅在注册场景下使用
+     */
+    @Override
+    public void add(LoginAccount account) {
+        save(account,canSimpleInsert(account));
     }
 
     @Override
-    public void save(LoginAccount account) {
-        if (!account.hasChanges()) {
-            return;
+    public void update(LoginAccount account) {
+        if (!account.hasChanges()) return;
+        save(account, false);
+    }
+
+    private void save(LoginAccount account, boolean simplerInsert){
+        validateOwnership(account);
+        if (simplerInsert) simpleInsert(account);
+        else persistWithLookup(account);
+    }
+    /**
+     * 检查是否是使用单个身份注册的场景，仅限 public void insert(LoginAccount account)
+     * */
+    private boolean canSimpleInsert(LoginAccount account){
+        List<UserIdentity> identities = account.addedIdentities();
+        if (identities.size() == 1){
+            UserIdentity identity = identities.getFirst();
+            ShardId shardId = shardResolver.resolve(identity.getType().getCode(), identity.getIdentifier());
+            if (shardId.equals(account.getUserId().shardId())){
+                return true;
+            }
         }
+        return false;
+    }
+
+    private void validateOwnership(LoginAccount account){
+        account.addedIdentities().forEach(i ->
+        {
+            if (!i.getUserId().equals(account.getUserId())){
+                throw new IllegalArgumentException("身份标识所属用户必须要Account相同");
+            }
+            if (!i.getId().hasSameShard(i.getUserId())){
+                throw new IllegalArgumentException("身份标识的Id要和所属用户id输入同一分片");
+            }
+
+        });
+        account.addedFactors().forEach(f -> {
+            if (!f.getUserId().equals(account.getUserId())){
+                throw new IllegalArgumentException("二次验证因子所属用户必须要Account相同");
+            }
+            if (!f.getId().hasSameShard(f.getUserId())){
+                throw new IllegalArgumentException("二次验证因子的Id要和所属用户id输属于同一分片");
+            }
+        });
+    }
+
+    /**
+     * 用于初次，使用单个身份注册的场景，仅限 public void insert(LoginAccount account)
+     */
+    private void simpleInsert(LoginAccount account){
+        UserIdentity identity = account.addedIdentities().getFirst();
+        tx.executeWithoutResult(s -> {
+            lookup.insertConfirmed(identity.getIdentityIdentifier(), account.getUserId());
+            writeRows(account);
+        });
+        account.clearChanges();
+    }
+
+    private void persistWithLookup(LoginAccount account) {
+
         ShardedId userId = account.getUserId();
         List<UserIdentity> reserved = new ArrayList<>();
         try {
             for (UserIdentity identity : account.addedIdentities()) {
-                lookup.reserve(identity.getType(), identity.getIdentifier(), userId);
+                lookup.reserve(identity.getIdentityIdentifier(), userId);
                 reserved.add(identity);
             }
             for (UserIdentity identity : account.removedIdentities()) {
-                lookup.release(identity.getType(), identity.getIdentifier(), userId);
+                lookup.cancelReserve(identity.getIdentityIdentifier(), userId);
             }
             tx.executeWithoutResult(status -> {
                 registerLookupCallbacks(reserved, userId);
@@ -96,7 +162,6 @@ public class LoginAccountRepositoryImpl implements LoginAccountRepository {
         }
         account.clearChanges();
     }
-
     // ------------------------------------------------------------------ 落库（同分片本地事务内）
 
     /** 顺序：因子删/改 → 身份删 → 身份改 → 身份增 → 因子增（因子引用的身份先于因子存在） */
@@ -131,14 +196,14 @@ public class LoginAccountRepositoryImpl implements LoginAccountRepository {
 
     private void deleteIdentity(UserIdentity identity) {
         identityMapper.delete(Wrappers.<UserIdentityPO>lambdaQuery()
-                .eq(UserIdentityPO::getId, toLong(identity.getId()))
-                .eq(UserIdentityPO::getUserId, toLong(identity.getUserId())));
+                .eq(UserIdentityPO::getId, identity.getId().value())
+                .eq(UserIdentityPO::getUserId, identity.getUserId().value()));
     }
 
     private void deleteFactor(MfaFactor factor) {
         factorMapper.delete(Wrappers.<UserMfaFactorPO>lambdaQuery()
-                .eq(UserMfaFactorPO::getId, toLong(factor.getId()))
-                .eq(UserMfaFactorPO::getUserId, toLong(factor.getUserId())));
+                .eq(UserMfaFactorPO::getId, factor.getId().value())
+                .eq(UserMfaFactorPO::getUserId, factor.getUserId().value()));
     }
 
     // ------------------------------------------------------------------ lookup 确认 / 释放
@@ -152,7 +217,7 @@ public class LoginAccountRepositoryImpl implements LoginAccountRepository {
             public void afterCommit() {
                 for (UserIdentity identity : reserved) {
                     try {
-                        lookup.confirm(identity.getType(), identity.getIdentifier(), userId);
+                        lookup.confirm(identity.getIdentityIdentifier(), userId);
                     } catch (RuntimeException e) {
                         // 数据已提交，不能让调用方看到失败；遗留的 PENDING 由回收任务补确认
                         log.error("identity_lookup 确认失败，等待回收任务处理 type={}", identity.getType(), e);
@@ -171,14 +236,10 @@ public class LoginAccountRepositoryImpl implements LoginAccountRepository {
 
     private void releaseQuietly(UserIdentity identity, ShardedId userId) {
         try {
-            lookup.release(identity.getType(), identity.getIdentifier(), userId);
+            lookup.cancelReserve(identity.getIdentityIdentifier(), userId);
         } catch (RuntimeException e) {
             log.warn("identity_lookup 释放失败，等待回收任务处理 type={}", identity.getType(), e);
         }
     }
 
-    // 与 IdentityLookupGateway 同一处对接点：按项目里 ShardedId 的实际 API 调整
-    private static Long toLong(ShardedId id) {
-        return id.value();
-    }
 }
