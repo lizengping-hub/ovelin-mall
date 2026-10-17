@@ -1,13 +1,19 @@
 
 dataSources:
-  auth_ds0:
+  auth_ds_0:
     jdbcUrl: jdbc:mysql://127.0.0.1:3308/auth_database?allowPublicKeyRetrieval=true&useSSL=false&serverTimezone=UTC
     dataSourceClassName: com.zaxxer.hikari.HikariDataSource
     driverClassName: com.mysql.cj.jdbc.Driver
     username: ovelin
     password: ovelin
-  auth_ds1:
+  auth_ds_1:
     jdbcUrl: jdbc:mysql://127.0.0.1:3309/auth_database?allowPublicKeyRetrieval=true&useSSL=false&serverTimezone=UTC
+    dataSourceClassName: com.zaxxer.hikari.HikariDataSource
+    driverClassName: com.mysql.cj.jdbc.Driver
+    username: ovelin
+    password: ovelin
+  shared_database:
+    jdbcUrl: jdbc:mysql://127.0.0.1:3308/shared_database?allowPublicKeyRetrieval=true&useSSL=false&serverTimezone=UTC
     dataSourceClassName: com.zaxxer.hikari.HikariDataSource
     driverClassName: com.mysql.cj.jdbc.Driver
     username: ovelin
@@ -15,10 +21,15 @@ dataSources:
 
 
 rules:
+- !SINGLE
+  tables:
+    # MySQL 风格
+    - shared_database.* # 加载指定数据源中的全部单表
+  defaultDataSource: shared_database
 - !SHARDING
   tables:
     user:
-      actualDataNodes: auth_ds$->{0..1}.user_$->{0..1}
+      actualDataNodes: auth_ds_$->{0..1}.user_$->{0..1}
       databaseStrategy:
         standard:
           shardingColumn: id
@@ -28,17 +39,27 @@ rules:
           shardingColumn: id
           shardingAlgorithmName: ovelin_table_algo
     user_identity:
-      actualDataNodes: auth_ds$->{0..1}.user_identity_$->{0..1}
+      actualDataNodes: auth_ds_$->{0..1}.user_identity_$->{0..1}
       databaseStrategy:
         complex:
           shardingColumns: id, user_id
-          shardingAlgorithmName: ovelin_db_complex_algo
+          shardingAlgorithmName: ovelin_complex_db_algo
       tableStrategy:
         complex:
           shardingColumns: id, user_id
-          shardingAlgorithmName: ovelin_table_complex_algo
+          shardingAlgorithmName: ovelin_complex_table_algo
+    identity_lookup:
+      actualDataNodes: auth_ds_$->{0..1}.identity_lookup_$->{0..1}
+      databaseStrategy:
+        complex:
+          shardingColumns: identity_type, identifier
+          shardingAlgorithmName: ovelin_complex_lookup_db_algo
+      tableStrategy:
+        complex:
+          shardingColumns: identity_type, identifier
+          shardingAlgorithmName: ovelin_complex_lookup_table_algo
     user_password:
-      actualDataNodes: auth_ds$->{0..1}.user_password_$->{0..1}
+      actualDataNodes: auth_ds_$->{0..1}.user_password_$->{0..1}
       databaseStrategy:
         standard:
           shardingColumn: user_id
@@ -47,28 +68,52 @@ rules:
         standard:
           shardingColumn: user_id
           shardingAlgorithmName: ovelin_table_algo
+    user_mfa_factor:
+      actualDataNodes: auth_ds_$->{0..1}.user_mfa_factor_$->{0..1}
+      databaseStrategy:
+        complex:
+          shardingColumns: id, user_id
+          shardingAlgorithmName: ovelin_complex_db_algo
+      tableStrategy:
+        complex:
+          shardingColumns: id, user_id
+          shardingAlgorithmName: ovelin_complex_table_algo
 
   shardingAlgorithms:
     ovelin_db_algo:
-      type: OVELIN_DS_STANDARD_SHARDING
+      type: OVELIN_STANDARD_DS_SHARDING
       props:
-        table-count: 2
-        ds-count: 2
+        table_count: 2
+        ds_count: 2
     ovelin_table_algo:
-      type: OVELIN_TABLE_STANDARD_SHARDING
+      type: OVELIN_STANDARD_TABLE_SHARDING
       props:
-        table-count: 2
-        ds-count: 2
-    ovelin_db_complex_algo:
-      type: OVELIN_DS_COMPLEX_SHARDING
+        table_count: 2
+        ds_count: 2
+    ovelin_complex_db_algo:
+      type: OVELIN_COMPLEX_DS_SHARDING
       props:
-        table-count: 2
-        ds-count: 2
-    ovelin_table_complex_algo:
-      type: OVELIN_TABLE_COMPLEX_SHARDING
+        table_count: 2
+        ds_count: 2
+    ovelin_complex_table_algo:
+      type: OVELIN_COMPLEX_TABLE_SHARDING
       props:
-        table-count: 2
-        ds-count: 2
+        table_count: 2
+        ds_count: 2
+    ovelin_complex_lookup_db_algo:
+      type: OVELIN_COMPLEX_DS_SHARDING
+      props:
+        table_count: 2
+        ds_count: 2
+        sharding_string_field_0: identity_type
+        sharding_string_field_1: identifier
+    ovelin_complex_lookup_table_algo:
+      type: OVELIN_COMPLEX_TABLE_SHARDING
+      props:
+        table_count: 2
+        ds_count: 2
+        sharding_string_field_0: identity_type
+        sharding_string_field_1: identifier
 
 props:
   sql-show: true

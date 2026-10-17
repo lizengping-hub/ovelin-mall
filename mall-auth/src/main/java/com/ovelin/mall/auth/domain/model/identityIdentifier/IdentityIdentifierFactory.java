@@ -10,12 +10,6 @@ public final class IdentityIdentifierFactory {
     public static IdentityIdentifier reconstitute(
             String type, String value) {
         IdentityType identityType = IdentityType.fromCode(type);
-        return switch (identityType) {
-            case EMAIL -> EmailIdentifier.reconstitute(value);
-            case PHONE -> SimplePhoneIdentifier.reconstitute(value);
-            case USERNAME -> UserNameIdentifier.reconstitute(value);
-            case OAUTH -> throw new InvalidArgumentException(
-                    "OAuth identifier requires a provider");
-        };
+        return new SimpleIdentifier(identityType, value);
     }
 }

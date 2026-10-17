@@ -8,8 +8,10 @@ import lombok.RequiredArgsConstructor;
 @Getter
 public enum IdentityLookupStatus {
 
-    PENDING(0),
-    ACTIVE(1);
+    RESERVED(0),
+    ACTIVE(1),
+    RELEASING(2);
+
 
     private final int code;
 

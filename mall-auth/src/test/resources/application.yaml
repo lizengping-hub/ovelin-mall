@@ -6,7 +6,7 @@ id-generator:
 
 logging:
   file:
-    name: logs/mall-user.log
+    name: logs/mall-auth.log
   pattern:
     console: "%d{yyyy-MM-dd HH:mm:ss.SSS} [%X{requestId:-}] %-5level [%thread] %logger{36} - %msg%n"
     file: "%d{yyyy-MM-dd HH:mm:ss.SSS} [%X{requestId:-}] %-5level [%thread] %logger{36} - %msg%n"

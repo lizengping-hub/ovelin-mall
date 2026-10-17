@@ -239,7 +239,7 @@ public class LoginAccount {
         return !identityChanges.isEmpty() || !factorChanges.isEmpty();
     }
 
-    /** 仓储 save 成功后调用 */
+    /** 仓储 add/update 成功后调用 */
     public void clearChanges() {
         identityChanges.clear();
         factorChanges.clear();
