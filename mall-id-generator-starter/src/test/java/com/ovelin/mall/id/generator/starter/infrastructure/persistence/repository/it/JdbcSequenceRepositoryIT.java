@@ -1,6 +1,7 @@
 package com.ovelin.mall.id.generator.starter.infrastructure.persistence.repository.it;
 
 import com.ovelin.mall.id.generator.starter.domain.repository.SequenceRepository;
+import com.ovelin.mall.id.generator.starter.infrastructure.persistence.mapper.IdSequenceMapper;
 import com.ovelin.mall.id.generator.starter.infrastructure.persistence.repository.SequenceRepositoryImpl;
 import org.junit.jupiter.api.BeforeEach;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -18,9 +19,6 @@ import java.util.Optional;
 public class JdbcSequenceRepositoryIT extends SequenceRepositoryContractIT {
 
     @Autowired
-    SequenceRepository repository;
-
-    @Autowired
     ApplicationContext context;
 
     @Autowired
@@ -34,7 +32,7 @@ public class JdbcSequenceRepositoryIT extends SequenceRepositoryContractIT {
 
     @Override
     protected SequenceRepository createRepository() {
-        return repository;
+        return context.getBean(SequenceRepositoryImpl.class);
     }
 
     /**

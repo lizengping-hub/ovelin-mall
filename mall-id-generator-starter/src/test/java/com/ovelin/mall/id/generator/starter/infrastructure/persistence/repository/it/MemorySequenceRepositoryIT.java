@@ -10,7 +10,7 @@ class MemorySequenceRepositoryIT extends SequenceRepositoryContractIT {
 
     @Override
     protected SequenceRepository createRepository() {
-        IdGeneratorProperties properties = new IdGeneratorProperties(100); // TODO: 如果参数不是号段容量,按实际调整
+        IdGeneratorProperties properties = new IdGeneratorProperties(1000);
         return new MemorySequenceRepository(properties);
     }
 }

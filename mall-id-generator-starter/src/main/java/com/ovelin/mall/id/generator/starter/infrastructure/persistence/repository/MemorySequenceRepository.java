@@ -10,7 +10,7 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicLong;
 
 public class MemorySequenceRepository implements SequenceRepository {
-    private IdGeneratorProperties properties;
+    private final IdGeneratorProperties properties;
     public MemorySequenceRepository(IdGeneratorProperties properties) {
         this.properties = properties;
     }

@@ -1,9 +1,9 @@
 spring:
   application:
     name: id-generator-service
-
-id-generator:
-  allocation-size: 1000
+ovelin:
+  id-generator:
+    allocation-size: 1000
 
 server:
   port: 8080

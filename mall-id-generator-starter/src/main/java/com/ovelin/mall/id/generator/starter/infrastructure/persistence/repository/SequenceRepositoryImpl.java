@@ -12,8 +12,8 @@ import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
 public class SequenceRepositoryImpl implements SequenceRepository {
-    private IdSequenceMapper idSequenceMapper;
-    private IdGeneratorProperties properties;
+    private final IdSequenceMapper idSequenceMapper;
+    private final IdGeneratorProperties properties;
     public SequenceRepositoryImpl(IdSequenceMapper idSequenceMapper, IdGeneratorProperties properties) {
         this.idSequenceMapper = idSequenceMapper;
         this.properties = properties;
