@@ -3,6 +3,8 @@ package com.ovelin.mall.auth.infrastructure.persistence.repository;
 import com.ovelin.mall.auth.domain.model.aggregate.UserPassword;
 import com.ovelin.mall.auth.infrastructure.persistence.AuthIntegrationTestSupport;
 import com.ovelin.mall.common.sharding.core.ov.ShardedId;
+import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 
@@ -16,66 +18,100 @@ class UserPasswordRepositoryImplIT extends AuthIntegrationTestSupport {
     @Autowired
     UserPasswordRepositoryImpl repository;
 
-    @Test
-    void add后能还原() {
-        ShardedId userId = newId("user", 0);
-        UserPassword password = UserPassword.create(userId, "hash-1", now());
+    @Nested
+    @DisplayName("add / findByUserId")
+    class AddAndFind {
+
+        @Test
+        @DisplayName("add 后能完整还原")
+        void restoresAfterAdd() {
+            UserPassword password = savedPassword("hash-1");
+
+            UserPassword actual = repository.findByUserId(password.getUserId()).orElseThrow();
+
+            assertThat(actual).usingRecursiveComparison().isEqualTo(password);
+        }
+
+        @Test
+        @DisplayName("记录不存在时返回空")
+        void returnsEmptyWhenAbsent() {
+            assertThat(repository.findByUserId(newId("user", 0))).isEmpty();
+        }
+    }
+
+    @Nested
+    @DisplayName("update")
+    class Update {
+
+        @Test
+        @DisplayName("持久化失败计数与锁定状态")
+        void persistsFailureAndLock() {
+            UserPassword password = savedPassword("hash-2");
+            Instant failAt = now();
+
+            password.recordFailure(1, Duration.ofMinutes(10), failAt);
+            repository.update(password);
+
+            UserPassword actual = reload(password);
+            assertThat(actual).usingRecursiveComparison().isEqualTo(password);
+            assertThat(actual.isLocked(failAt)).isTrue();
+        }
+
+        @Test
+        @DisplayName("认证成功后清零失败计数，lockedUntil 写回 null")
+        void clearsFailureAndLockOnSuccess() {
+            UserPassword password = savedPassword("hash-3");
+            password.recordFailure(1, Duration.ofMinutes(10), now());
+            repository.update(password);
+
+            password.recordSuccess();
+            repository.update(password);
+
+            UserPassword actual = reload(password);
+            assertThat(actual.getFailedAttempts()).isZero();
+            assertThat(actual.getLockedUntil()).isNull();
+        }
+
+        @Test
+        @DisplayName("持久化修改后的密码哈希与修改时间")
+        void persistsPasswordChange() {
+            UserPassword password = savedPassword("old-hash");
+            Instant changedAt = now().plusSeconds(60);
+
+            password.change("new-hash", changedAt);
+            repository.update(password);
+
+            UserPassword actual = reload(password);
+            assertThat(actual.getPasswordHash()).isEqualTo("new-hash");
+            assertThat(actual.getPasswordChangedAt()).isEqualTo(changedAt);
+        }
+    }
+
+    @Nested
+    @DisplayName("deleteByUserId")
+    class Delete {
+
+        @Test
+        @DisplayName("只删除目标用户，不影响其他用户")
+        void deletesOnlyTargetUser() {
+            UserPassword target = savedPassword("h1");
+            UserPassword other = savedPassword("h2");
+
+            repository.deleteByUserId(target.getUserId());
+
+            assertThat(repository.findByUserId(target.getUserId())).isEmpty();
+            assertThat(repository.findByUserId(other.getUserId())).isPresent();
+        }
+    }
+
+    /** 新建并落库一条密码记录，每次使用独立的 userId。 */
+    private UserPassword savedPassword(String hash) {
+        UserPassword password = UserPassword.create(newId("user", 0), hash, now());
         repository.add(password);
-
-        UserPassword actual = repository.findByUserId(userId).orElseThrow();
-
-        assertThat(actual).usingRecursiveComparison().isEqualTo(password);
+        return password;
     }
 
-    @Test
-    void 查不到时返回空() {
-        assertThat(repository.findByUserId(newId("user", 0))).isEmpty();
-    }
-
-    @Test
-    void update持久化失败计数和锁定_解锁后写回null() {
-        ShardedId userId = newId("user", 0);
-        UserPassword password = UserPassword.create(userId, "hash-2", now());
-        repository.add(password);
-
-        Instant failAt = now();
-        password.recordFailure(1, Duration.ofMinutes(10), failAt);
-        repository.update(password);
-        UserPassword locked = repository.findByUserId(userId).orElseThrow();
-        assertThat(locked.isLocked(failAt)).isTrue();
-
-        password.recordSuccess();
-        repository.update(password);
-        UserPassword unlocked = repository.findByUserId(userId).orElseThrow();
-        assertThat(unlocked.getLockedUntil()).isNull();
-        assertThat(unlocked.getFailedAttempts()).isZero();
-    }
-
-    @Test
-    void update持久化改密码() {
-        ShardedId userId = newId("user", 0);
-        UserPassword password = UserPassword.create(userId, "old-hash", now());
-        repository.add(password);
-
-        Instant changedAt = now().plusSeconds(60);
-        password.change("new-hash", changedAt);
-        repository.update(password);
-
-        UserPassword actual = repository.findByUserId(userId).orElseThrow();
-        assertThat(actual.getPasswordHash()).isEqualTo("new-hash");
-        assertThat(actual.getPasswordChangedAt()).isEqualTo(changedAt);
-    }
-
-    @Test
-    void deleteByUserId只删除该用户() {
-        ShardedId user1 = newId("user", 0);
-        ShardedId user2 = newId("user", 0);
-        repository.add(UserPassword.create(user1, "h1", now()));
-        repository.add(UserPassword.create(user2, "h2", now()));
-
-        repository.deleteByUserId(user1);
-
-        assertThat(repository.findByUserId(user1)).isEmpty();
-        assertThat(repository.findByUserId(user2)).isPresent();
+    private UserPassword reload(UserPassword password) {
+        return repository.findByUserId(password.getUserId()).orElseThrow();
     }
 }
