@@ -12,13 +12,14 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-import org.springframework.dao.DuplicateKeyException;
 
 import java.util.ConcurrentModificationException;
 
+import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.Mockito.doThrow;
+import static org.mockito.ArgumentMatchers.anyInt;
+import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -53,38 +54,72 @@ class IdentityLookupGatewayRaceTest {
         return po;
     }
 
-    @Test
-    @DisplayName("reserve：插入冲突但查不到冲突记录（冲突方刚被释放），重试一次后仍冲突，抛出 IdentifierAlreadyTakenException")
-    void reserveThrowsAlreadyTakenWhenConflictDisappearsButRetryStillConflicts() {
-        // insert 始终抛主键冲突；selectByIdentifier 默认返回 null（记录已不可见）
-        doThrow(new DuplicateKeyException("duplicate")).when(mapper).insert(any(IdentityLookupPO.class));
+    private void givenRowExists(ShardedId owner, IdentityLookupStatus status) {
+        when(mapper.selectByIdentifier(IDENTIFIER.type().getCode(), IDENTIFIER.value()))
+                .thenReturn(existingRow(owner, status));
+    }
 
+    // ------------------------------------------------------------------ reserve
+
+    @Test
+    @DisplayName("reserve：upsert 之后查不到记录（冲突方恰好被释放），抛出 IdentifierAlreadyTakenException")
+    void reserveThrowsAlreadyTakenWhenRowDisappearsAfterUpsert() {
+        // insertOrTouch 默认返回 0；selectByIdentifier 默认返回 null（记录已不可见）
         assertThatThrownBy(() -> gateway().reserve(IDENTIFIER, userId(1L)))
                 .isInstanceOf(IdentifierAlreadyTakenException.class);
 
-        verify(mapper, times(2)).insert(any(IdentityLookupPO.class));   // 首次 + 重试一次，不会无限重试
+        verify(mapper, times(1)).insertOrTouch(any(), any(), any(), anyInt());
     }
 
+    // ------------------------------------------------------------------ cancelReserve / completeRelease
+
     @Test
-    @DisplayName("cancelReserve：属主和状态都匹配却没删掉（读写之间被并发修改），抛出 ConcurrentModificationException")
-    void cancelReserveThrowsWhenRowChangedBetweenDeleteAndRead() {
+    @DisplayName("cancelReserve：属主和状态都匹配却连续两次没删掉（读写之间被并发修改），抛出 ConcurrentModificationException")
+    void cancelReserveThrowsWhenDeleteKeepsMissingAMatchingRow() {
         ShardedId owner = userId(1L);
-        // deleteIfMatch 默认返回 0（没删掉）；随后读到的记录却仍属于自己且仍是 RESERVED
-        when(mapper.selectByIdentifier(IDENTIFIER.type().getCode(), IDENTIFIER.value()))
-                .thenReturn(existingRow(owner, IdentityLookupStatus.RESERVED));
+        givenRowExists(owner, IdentityLookupStatus.RESERVED);   // deleteIfMatch 默认返回 0
 
         assertThatThrownBy(() -> gateway().cancelReserve(IDENTIFIER, owner))
                 .isInstanceOf(ConcurrentModificationException.class);
+
+        verify(mapper, times(2)).deleteIfMatch(any(), any(), anyLong(), any());   // 首次 + 重试一次
     }
 
     @Test
-    @DisplayName("completeRelease：属主和状态都匹配却没删掉（读写之间被并发修改），抛出 ConcurrentModificationException")
-    void completeReleaseThrowsWhenRowChangedBetweenDeleteAndRead() {
+    @DisplayName("completeRelease：属主和状态都匹配却连续两次没删掉（读写之间被并发修改），抛出 ConcurrentModificationException")
+    void completeReleaseThrowsWhenDeleteKeepsMissingAMatchingRow() {
         ShardedId owner = userId(1L);
-        when(mapper.selectByIdentifier(IDENTIFIER.type().getCode(), IDENTIFIER.value()))
-                .thenReturn(existingRow(owner, IdentityLookupStatus.RELEASING));
+        givenRowExists(owner, IdentityLookupStatus.RELEASING);
 
         assertThatThrownBy(() -> gateway().completeRelease(IDENTIFIER, owner))
                 .isInstanceOf(ConcurrentModificationException.class);
+
+        verify(mapper, times(2)).deleteIfMatch(any(), any(), anyLong(), any());
+    }
+
+    @Test
+    @DisplayName("cancelReserve：第一次没删掉（读写之间被并发修改），重试一次删除成功，不抛异常")
+    void cancelReserveSucceedsWhenRetryDeleteSucceeds() {
+        ShardedId owner = userId(1L);
+        givenRowExists(owner, IdentityLookupStatus.RESERVED);
+        when(mapper.deleteIfMatch(IDENTIFIER.type().getCode(), IDENTIFIER.value(), owner.value(), IdentityLookupStatus.RESERVED))
+                .thenReturn(0, 1);
+
+        assertThatCode(() -> gateway().cancelReserve(IDENTIFIER, owner)).doesNotThrowAnyException();
+
+        verify(mapper, times(2)).deleteIfMatch(any(), any(), anyLong(), any());
+    }
+
+    @Test
+    @DisplayName("completeRelease：第一次没删掉（读写之间被并发修改），重试一次删除成功，不抛异常")
+    void completeReleaseSucceedsWhenRetryDeleteSucceeds() {
+        ShardedId owner = userId(1L);
+        givenRowExists(owner, IdentityLookupStatus.RELEASING);
+        when(mapper.deleteIfMatch(IDENTIFIER.type().getCode(), IDENTIFIER.value(), owner.value(), IdentityLookupStatus.RELEASING))
+                .thenReturn(0, 1);
+
+        assertThatCode(() -> gateway().completeRelease(IDENTIFIER, owner)).doesNotThrowAnyException();
+
+        verify(mapper, times(2)).deleteIfMatch(any(), any(), anyLong(), any());
     }
 }

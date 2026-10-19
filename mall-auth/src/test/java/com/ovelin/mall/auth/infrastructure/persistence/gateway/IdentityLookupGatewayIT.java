@@ -101,21 +101,21 @@ class IdentityLookupGatewayIT {
             assertThat(count()).isEqualTo(1);
             assertThat(gateway.findUserId(EMAIL_IDENTITY_IDENTIFIER)).isEmpty();
         }
+
         @Test
-        @DisplayName("相同值不同类型的身份可以同时占用")
+        @DisplayName("相同值、不同类型的标识互不冲突，可以同时占用")
         void sameValueWithDifferentTypeIsAllowed() {
-            ShardedId userId = newUserId();
+            ShardedId emailOwner = newUserId();
+            ShardedId oauthOwner = newUserId();
+            IdentityIdentifier sameValueOauth = IdentityIdentifierFactory.reconstitute(
+                    IdentityType.OAUTH.getCode(), EMAIL_IDENTITY_IDENTIFIER.value());
 
-            gateway.reserve(EMAIL_IDENTITY_IDENTIFIER, userId);
+            gateway.reserve(EMAIL_IDENTITY_IDENTIFIER, emailOwner);
+            gateway.reserve(sameValueOauth, oauthOwner);
 
-            IdentityIdentifier sameValueIdentifier = IdentityIdentifierFactory.reconstitute(IdentityType.OAUTH.getCode(), EMAIL_IDENTITY_IDENTIFIER.value());
-            gateway.reserve(sameValueIdentifier, userId);
-
-            assertLookup(EMAIL_IDENTITY_IDENTIFIER, userId, IdentityLookupStatus.RESERVED);
-            assertThat(gateway.findUserId(EMAIL_IDENTITY_IDENTIFIER)).isEmpty();
-
-            assertLookup(sameValueIdentifier, userId, IdentityLookupStatus.RESERVED);
-            assertThat(gateway.findUserId(sameValueIdentifier)).isEmpty();
+            assertLookup(EMAIL_IDENTITY_IDENTIFIER, emailOwner, IdentityLookupStatus.RESERVED);
+            assertLookup(sameValueOauth, oauthOwner, IdentityLookupStatus.RESERVED);
+            assertThat(count()).isEqualTo(2);
         }
 
         @Test
@@ -366,8 +366,8 @@ class IdentityLookupGatewayIT {
         }
 
         @Test
-        @DisplayName("他人已持有该标识时，cancelReserve 视为已完成，且不影响他人记录")
-        void cancelReservationOfAnotherUserIsNoOp() {
+        @DisplayName("他人已持有该标识的占位时，cancelReserve 视为已完成（幂等），他人的占位不受影响")
+        void cancelReserveOnAnotherUsersReservationIsNoOp() {
             ShardedId first = newUserId();
             gateway.reserve(EMAIL_IDENTITY_IDENTIFIER, first);
 
@@ -377,15 +377,15 @@ class IdentityLookupGatewayIT {
         }
 
         @Test
-        @DisplayName("取消他人已 ACTIVE 的记录是被允许的，记录保持 ACTIVE 且仍属于原用户")
-        void cancelActiveRecordOfAnotherUserIsAllowed() {
+        @DisplayName("他人已持有该标识且已 ACTIVE 时，cancelReserve 视为已完成（幂等），他人的记录不受影响")
+        void cancelReserveOnAnotherUsersActiveRecordIsNoOp() {
             ShardedId first = newUserId();
             gateway.reserve(EMAIL_IDENTITY_IDENTIFIER, first);
             gateway.confirm(EMAIL_IDENTITY_IDENTIFIER, first);
 
             gateway.cancelReserve(EMAIL_IDENTITY_IDENTIFIER, newUserId());
 
-
+            assertLookup(EMAIL_IDENTITY_IDENTIFIER, first, IdentityLookupStatus.ACTIVE);
             assertThat(gateway.findUserId(EMAIL_IDENTITY_IDENTIFIER)).contains(first);
         }
     }
@@ -510,12 +510,37 @@ class IdentityLookupGatewayIT {
         }
 
         @Test
-        @DisplayName("他人已持有该标识时，completeReleas 视为已完成，且不影响他人记录")
-        void completeReleaseOnRecordOfAnotherUserIsNoOp() {
+        @DisplayName("他人已持有该标识且处于 RELEASING 时，completeRelease 视为已完成（幂等），他人的记录不受影响")
+        void completeReleaseOnAnotherUsersReleasingRecordIsNoOp() {
             ShardedId owner = newReleasingUser();
+
             gateway.completeRelease(EMAIL_IDENTITY_IDENTIFIER, newUserId());
 
             assertLookup(EMAIL_IDENTITY_IDENTIFIER, owner, IdentityLookupStatus.RELEASING);
+        }
+
+        @Test
+        @DisplayName("他人已持有该标识且已 ACTIVE 时，completeRelease 视为已完成（属主校验先于状态校验），他人的记录不受影响")
+        void completeReleaseOnAnotherUsersActiveRecordIsNoOp() {
+            ShardedId owner = newUserId();
+            gateway.reserve(EMAIL_IDENTITY_IDENTIFIER, owner);
+            gateway.confirm(EMAIL_IDENTITY_IDENTIFIER, owner);
+
+            gateway.completeRelease(EMAIL_IDENTITY_IDENTIFIER, newUserId());
+
+            assertLookup(EMAIL_IDENTITY_IDENTIFIER, owner, IdentityLookupStatus.ACTIVE);
+            assertThat(gateway.findUserId(EMAIL_IDENTITY_IDENTIFIER)).contains(owner);
+        }
+
+        @Test
+        @DisplayName("他人已持有该标识且处于 RESERVED 时，completeRelease 视为已完成，他人的占位不受影响")
+        void completeReleaseOnAnotherUsersReservationIsNoOp() {
+            ShardedId owner = newUserId();
+            gateway.reserve(EMAIL_IDENTITY_IDENTIFIER, owner);
+
+            gateway.completeRelease(EMAIL_IDENTITY_IDENTIFIER, newUserId());
+
+            assertLookup(EMAIL_IDENTITY_IDENTIFIER, owner, IdentityLookupStatus.RESERVED);
         }
     }
 
@@ -736,8 +761,9 @@ class IdentityLookupGatewayIT {
             assertThat(handled).isEqualTo(total);
             assertThat(count()).isZero();
         }
+
         @Test
-        @DisplayName("某一行的 identityExists 抛异常，不影响其他过期记录被回收")
+        @DisplayName("某一条记录的 identityExists 抛异常，不影响其他过期 RESERVED 被回收")
         void reclaimContinuesAfterPredicateThrowsForOneRow() {
             gateway.reserve(EMAIL_IDENTITY_IDENTIFIER, newUserId());
             gateway.reserve(ANOTHER_EMAIL_IDENTIFIER, newUserId());
@@ -745,14 +771,15 @@ class IdentityLookupGatewayIT {
 
             int handled = gateway.reclaimReservedStale(Duration.ofMinutes(30), 100, pending -> {
                 if (pending.identifier().value().equals(EMAIL_IDENTITY_IDENTIFIER.value())) {
-                    throw new IllegalStateException("模拟查询超时");
+                    throw new IllegalStateException("模拟查询身份行超时");
                 }
                 return false;
             });
 
             assertThat(handled).isEqualTo(1);
-            assertThat(count()).isEqualTo(1);                                   // 抛异常的那条保留
-            assertThat(selectByIdentifier(EMAIL_IDENTITY_IDENTIFIER)).isNotNull();
+            assertThat(count()).isEqualTo(1);
+            assertThat(selectByIdentifier(EMAIL_IDENTITY_IDENTIFIER)).isNotNull();   // 抛异常的那条保留，等下一轮
+            assertThat(selectByIdentifier(ANOTHER_EMAIL_IDENTIFIER)).isNull();
         }
     }
 
@@ -835,23 +862,28 @@ class IdentityLookupGatewayIT {
             assertThat(handled).isEqualTo(1);
             assertThat(count()).isEqualTo(1);
         }
+
         @Test
-        @DisplayName("某一行的 identityExists 抛异常，不影响其他过期记录被回收")
+        @DisplayName("某一条记录的 identityExists 抛异常，不影响其他过期 RELEASING 被回收")
         void reclaimContinuesAfterPredicateThrowsForOneRow() {
-            gateway.reserve(EMAIL_IDENTITY_IDENTIFIER, newUserId());
-            gateway.reserve(ANOTHER_EMAIL_IDENTIFIER, newUserId());
+            newReleasingUser();
+            ShardedId second = newUserId();
+            gateway.reserve(ANOTHER_EMAIL_IDENTIFIER, second);
+            gateway.confirm(ANOTHER_EMAIL_IDENTIFIER, second);
+            gateway.beginRelease(ANOTHER_EMAIL_IDENTIFIER, second);
             backdateAll();
 
             int handled = gateway.reclaimReleasingStale(Duration.ofMinutes(30), 100, pending -> {
                 if (pending.identifier().value().equals(EMAIL_IDENTITY_IDENTIFIER.value())) {
-                    throw new IllegalStateException("模拟查询超时");
+                    throw new IllegalStateException("模拟查询身份行超时");
                 }
                 return false;
             });
 
             assertThat(handled).isEqualTo(1);
-            assertThat(count()).isEqualTo(1);                                   // 抛异常的那条保留
-            assertThat(selectByIdentifier(EMAIL_IDENTITY_IDENTIFIER)).isNotNull();
+            assertThat(count()).isEqualTo(1);
+            assertThat(selectByIdentifier(EMAIL_IDENTITY_IDENTIFIER)).isNotNull();   // 抛异常的那条保留，等下一轮
+            assertThat(selectByIdentifier(ANOTHER_EMAIL_IDENTIFIER)).isNull();
         }
     }
 
@@ -876,10 +908,12 @@ class IdentityLookupGatewayIT {
             assertThat(handled).isZero();
             assertLookup(EMAIL_IDENTITY_IDENTIFIER, userId, IdentityLookupStatus.RELEASING);
         }
+
         @Test
-        @DisplayName("记录已经是 RELEASING 时重复 beginRelease（重试），应刷新 updated_at，避免释放进行中被回收")
-        void idempotentBeginReleaseRefreshesUpdatedAt() {
+        @DisplayName("abortRelease 后再次 beginRelease，应重新计时而不是沿用旧的 updated_at")
+        void secondBeginReleaseRefreshesUpdatedAt() {
             ShardedId userId = newReleasingUser();
+            gateway.abortRelease(EMAIL_IDENTITY_IDENTIFIER, userId);
             backdate(EMAIL_IDENTITY_IDENTIFIER);
 
             gateway.beginRelease(EMAIL_IDENTITY_IDENTIFIER, userId);
@@ -888,11 +922,11 @@ class IdentityLookupGatewayIT {
             assertThat(handled).isZero();
             assertLookup(EMAIL_IDENTITY_IDENTIFIER, userId, IdentityLookupStatus.RELEASING);
         }
+
         @Test
-        @DisplayName("abortRelease 后再次 beginRelease，应重新计时而不是沿用旧的 updated_at")
-        void secondBeginReleaseRefreshesUpdatedAt() {
+        @DisplayName("记录已经是 RELEASING 时重复 beginRelease（重试），应刷新 updated_at，避免释放进行中被回收")
+        void idempotentBeginReleaseRefreshesUpdatedAt() {
             ShardedId userId = newReleasingUser();
-            gateway.abortRelease(EMAIL_IDENTITY_IDENTIFIER, userId);
             backdate(EMAIL_IDENTITY_IDENTIFIER);
 
             gateway.beginRelease(EMAIL_IDENTITY_IDENTIFIER, userId);

@@ -47,9 +47,15 @@ import java.util.function.Predicate;
  * 不会被外层事务回滚带走，也不会被外层事务长时间持有行锁。
  * 只有 {@link #insertConfirmed} 要求加入调用方事务（MANDATORY）。
  * <p>
- * 除 {@link #findUserId} 外，所有状态变更方法都是幂等的：
- * 目标状态已达成且属于同一用户时直接成功；记录已属于其他用户时视为已完成（补偿目标已达成），直接返回
- * 状态不符合抛 {@link InvalidIdentifierStatusException}。
+ * 除 {@link #findUserId} 和 {@link #insertConfirmed} 外，所有状态变更方法都是幂等的：
+ * <ul>
+ *   <li>转换类（reserve / confirm / beginRelease / abortRelease）：目标状态已达成且属于同一用户时直接成功；
+ *       记录属于他人抛 {@link IdentifierNotOwnedByUserException}；状态不符合抛 {@link InvalidIdentifierStatusException}</li>
+ *   <li>删除类（cancelReserve / completeRelease）是补偿操作，目标是"我不再持有该标识"：
+ *       记录不存在、或已被他人占用都视为已完成，直接返回（否则重试任务会永远失败）；
+ *       记录仍是本用户的但状态不符合，抛 {@link InvalidIdentifierStatusException}</li>
+ * </ul>
+ * 重复 reserve / 重复 beginRelease 会刷新 updated_at，表示该操作仍在进行中，避免被回收任务误回收。
  */
 @Component
 @RequiredArgsConstructor
@@ -64,13 +70,13 @@ public class IdentityLookupGateway {
     //  ------------------------------------------------------------------  reserve
 
     /**
-     * 占位：INSERT RESERVED。同一用户对同一标识重复占位（重试）视为幂等成功。
+     * 占位：INSERT RESERVED。同一用户对同一标识重复占位（重试）视为幂等成功，并刷新 updated_at。
      * 注意：用户注册时的重试和网络抖动都会产生不同的 userId，除非在第一次请求时就记录下 userId，
      * 否则重试会被当作"另一个用户"而被拒绝。
      *
      * @throws IdentifierNotOwnedByUserException 标识已被其他用户占用（任意状态）
      * @throws InvalidIdentifierStatusException  标识已是本用户的，但状态不是 RESERVED（已 ACTIVE / RELEASING）
-     * @throws IdentifierAlreadyTakenException  upsert 后查不到记录（理论上不会发生）
+     * @throws IdentifierAlreadyTakenException   极端并发：upsert 之后查不到记录（冲突方恰好被释放），调用方可重试
      */
     @Transactional(propagation = Propagation.REQUIRES_NEW)
     public void reserve(IdentityIdentifier identifier, ShardedId userId) {
@@ -107,10 +113,11 @@ public class IdentityLookupGateway {
 
     /**
      * 取消占位：删除本用户的 RESERVED 记录。用于占位后其它事务失败回滚，
-     * 或 cancelReserve 自身失败后由自动任务重试。记录不存在视为幂等成功。
+     * 或 cancelReserve 自身失败后由自动任务重试。
+     * 记录不存在、或已被其他用户占用（说明本用户的占位早已被清理）都视为已完成，直接返回。
      *
-     * @throws IdentifierNotOwnedByUserException 记录属于其他用户
-     * @throws InvalidIdentifierStatusException  记录已 ACTIVE / RELEASING，不能当作占位取消
+     * @throws InvalidIdentifierStatusException 记录是本用户的，但已 ACTIVE / RELEASING，不能当作占位取消
+     * @throws ConcurrentModificationException  记录属主和状态都匹配，但重试删除仍未成功（读写之间被并发修改），调用方可重试
      */
     @Transactional(propagation = Propagation.REQUIRES_NEW)
     public void cancelReserve(IdentityIdentifier identifier, ShardedId userId) {
@@ -120,7 +127,8 @@ public class IdentityLookupGateway {
     //   ------------------------------------------------------------------    release
 
     /**
-     * 申请释放：ACTIVE → RELEASING（登录路由立即不可见）。已是本用户的 RELEASING 视为幂等成功。
+     * 申请释放：ACTIVE → RELEASING（登录路由立即不可见）。
+     * 已是本用户的 RELEASING 视为幂等成功，并刷新 updated_at（表示释放仍在进行）。
      *
      * @throws IdentifierNotExistException       记录不存在
      * @throws IdentifierNotOwnedByUserException 记录属于其他用户
@@ -129,14 +137,14 @@ public class IdentityLookupGateway {
     @Transactional(propagation = Propagation.REQUIRES_NEW)
     public void beginRelease(IdentityIdentifier identifier, ShardedId userId) {
         idempotentUpdateStatus(identifier, userId, IdentityLookupStatus.ACTIVE, IdentityLookupStatus.RELEASING);
-
     }
 
     /**
-     * 完成释放：删除本用户的 RELEASING 记录。记录不存在视为幂等成功。
+     * 完成释放：删除本用户的 RELEASING 记录。
+     * 记录不存在、或已被其他用户占用（说明本用户的记录早已删除）都视为已完成，直接返回。
      *
-     * 记录已属于其他用户时视为已完成（补偿目标已达成），直接返回
-     * @throws InvalidIdentifierStatusException  记录不处于 RELEASING（必须先 {@link #beginRelease}）
+     * @throws InvalidIdentifierStatusException 记录是本用户的，但不处于 RELEASING（必须先 {@link #beginRelease}）
+     * @throws ConcurrentModificationException 记录属主和状态都匹配，但重试删除仍未成功（读写之间被并发修改），调用方可重试
      */
     @Transactional(propagation = Propagation.REQUIRES_NEW)
     public void completeRelease(IdentityIdentifier identifier, ShardedId userId) {
@@ -161,63 +169,49 @@ public class IdentityLookupGateway {
         return Optional.ofNullable(po).map(p -> ShardedId.fromId(p.getUserId()));
     }
 
+    // ------------------------------------------------------------------ reclaim
+
     /**
      * 回收崩溃遗留的 RESERVED（供定时任务调用）。
      * 对 updated_at 早于 olderThan 的 RESERVED，交给 identityExists 判断身份行是否已落库：
-     * 已落库 → 补确认（ACTIVE）；未落库 → 删除占位。两种处理都只作用于仍为 RESERVED 的行。
+     * 已落库 → 补确认（ACTIVE）；未落库 → 删除占位。
+     * 修改时会再次校验属主、状态和 updated_at 仍早于 olderThan，
+     * 所以判断期间被正常流程处理或刷新过的记录不会被误改。
      * 查询不带分片键，会广播到所有分片，仅用于后台任务。
+     * 单条记录处理失败只记录日志，不影响其他记录。
      *
-     * @return 实际还原或删除的记录数
+     * @return 实际被补确认或删除的记录数（判断期间被别人处理过而跳过的不计入）
      */
     public int reclaimReservedStale(Duration olderThan, int limit, Predicate<PendingLookup> identityExists) {
-        List<IdentityLookupPO> stale = mapper.selectStale(IdentityLookupStatus.RESERVED.getCode(), olderThan.getSeconds(), limit);
-        log.debug("Found reserved stale {}", stale.size());
-        int handled = 0;
-        for (IdentityLookupPO po : stale) {
-            try {
-                IdentityIdentifier identifier = IdentityIdentifierFactory.reconstitute(po.getIdentityType(), po.getIdentifier());
-                ShardedId userId = ShardedId.fromId(po.getUserId());
-                PendingLookup pending = new PendingLookup(identifier, userId);
-
-                if (identityExists.test(pending)) {
-                    if (mapper.transitionIfStale(
-                            identifier.type().getCode(),
-                            identifier.value(),
-                            userId.value(),
-                            IdentityLookupStatus.RESERVED.getCode(),
-                            IdentityLookupStatus.ACTIVE.getCode(),
-                            olderThan.getSeconds()
-                    ) == 1) handled ++;
-                } else {
-                    if (mapper.deleteIfStale(
-                            identifier.type().getCode(),
-                            identifier.value(),
-                            userId.value(),
-                            IdentityLookupStatus.RESERVED.getCode(),
-                            olderThan.getSeconds()
-                    ) == 1) handled ++;
-                }
-            } catch (RuntimeException e){
-                log.error("ReclaimReservedStale error of user {}: ",po.getUserId(), e);
-            }
-
-        }
-        log.debug("Resolve reserved stale {}", handled);
-        return handled;
+        return reclaimStale(IdentityLookupStatus.RESERVED, olderThan, limit, identityExists);
     }
 
     /**
      * 回收崩溃遗留的 RELEASING（供定时任务调用）。
      * 对 updated_at 早于 olderThan 的 RELEASING，交给 identityExists 判断身份行是否还在：
      * 仍在（释放没有真正完成）→ 回滚为 ACTIVE；已不在（释放已完成，只差删除 lookup）→ 删除记录。
-     * 两种处理都只作用于仍为 RELEASING 的行。
+     * 修改时会再次校验属主、状态和 updated_at 仍早于 olderThan，
+     * 所以判断期间被正常流程处理或刷新过的记录不会被误改。
      * 查询不带分片键，会广播到所有分片，仅用于后台任务。
+     * 单条记录处理失败只记录日志，不影响其他记录。
      *
-     * @return 实际还原或删除的记录数
+     * @return 实际被还原或删除的记录数（判断期间被别人处理过而跳过的不计入）
      */
     public int reclaimReleasingStale(Duration olderThan, int limit, Predicate<PendingLookup> identityExists) {
-        List<IdentityLookupPO> stale = mapper.selectStale(IdentityLookupStatus.RELEASING.getCode(), olderThan.getSeconds(), limit);
-        log.debug("Found releasing stale {}", stale.size());
+        return reclaimStale(IdentityLookupStatus.RELEASING, olderThan, limit, identityExists);
+    }
+
+    /**
+     * 回收的公共流程。只尝试一次、不做幂等：条件没匹配上说明记录已被正常流程处理或刷新，直接放过，
+     * 若仍然过期，下一轮扫描会再次选中。
+     * 注意日志里只打印标识类型和 userId，不打印标识值（邮箱、手机号属于个人信息）。
+     */
+    private int reclaimStale(IdentityLookupStatus staleStatus, Duration olderThan, int limit,
+                             Predicate<PendingLookup> identityExists) {
+        long olderThanSeconds = olderThan.getSeconds();
+        List<IdentityLookupPO> stale = mapper.selectStale(staleStatus.getCode(), olderThanSeconds, limit);
+        log.debug("Found {} stale {} lookups", stale.size(), staleStatus);
+
         int handled = 0;
         for (IdentityLookupPO po : stale) {
             try {
@@ -225,40 +219,44 @@ public class IdentityLookupGateway {
                 ShardedId userId = ShardedId.fromId(po.getUserId());
                 PendingLookup pending = new PendingLookup(identifier, userId);
 
+                int affected;
                 if (identityExists.test(pending)) {
-                    if (mapper.transitionIfStale(
+                    // RESERVED：身份行已落库 → 补确认；RELEASING：身份行仍在 → 回滚。目标状态都是 ACTIVE
+                    affected = mapper.transitionIfStale(
                             identifier.type().getCode(),
                             identifier.value(),
                             userId.value(),
-                            IdentityLookupStatus.RELEASING.getCode(),
+                            staleStatus.getCode(),
                             IdentityLookupStatus.ACTIVE.getCode(),
-                            olderThan.getSeconds()
-                    ) == 1) handled ++;
+                            olderThanSeconds);
                 } else {
-                    if (mapper.deleteIfStale(
+                    affected = mapper.deleteIfStale(
                             identifier.type().getCode(),
                             identifier.value(),
                             userId.value(),
-                            IdentityLookupStatus.RELEASING.getCode(),
-                            olderThan.getSeconds()
-                    ) == 1) handled ++;
+                            staleStatus.getCode(),
+                            olderThanSeconds);
                 }
-            } catch (RuntimeException e){
-                log.error("ReclaimReleasingStale error of user {}: ",po.getUserId(), e);
+                if (affected == 1) {
+                    handled++;
+                }
+            } catch (RuntimeException e) {
+                log.error("Reclaim stale {} lookup failed, identityType={}, userId={}",
+                        staleStatus, po.getIdentityType(), po.getUserId(), e);
             }
-
         }
-        log.debug("Resolve releasing stale {}", handled);
+        log.debug("Reclaimed {} of {} stale {} lookups", handled, stale.size(), staleStatus);
         return handled;
     }
 
     // -------------------------------- 内部，幂等操作
 
     private void idempotentInsert(IdentityIdentifier identifier, ShardedId userId, IdentityLookupStatus status) {
-
+        // INSERT ... ON DUPLICATE KEY UPDATE：冲突时只有"同一用户、同一状态"才刷新 updated_at，别人的记录原样不动。
+        // 冲突时直接加 X 锁，避免"INSERT 冲突持有 S 锁 → 再 UPDATE 升级 X 锁"造成的并发死锁。
         mapper.insertOrTouch(identifier.type().getCode(), identifier.value(), userId.value(), status.getCode());
         // 不要依赖返回的影响行数：JDBC 默认返回"匹配行数"，
-        // 别人的记录没被修改时也会返回 1，和"插入成功"分不开
+        // 别人的记录没被修改时也会返回 1，和"插入成功"分不开，所以必须再读一次校验属主和状态
         IdentityLookupPO existing = selectByIdentifier(identifier);
         if (existing == null) {
             throw new IdentifierAlreadyTakenException(identifier);   // 理论上不会发生
@@ -275,7 +273,6 @@ public class IdentityLookupGateway {
         IdentityLookupPO existing = selectByIdentifier(identifier);
 
         if (existing == null) {
-            // 数据已经不存在
             throw new IdentifierNotExistException(identifier);
         }
 
@@ -283,7 +280,9 @@ public class IdentityLookupGateway {
         // 记录属于当前用户，且已经处于目标状态：幂等成功
 
         if (to == IdentityLookupStatus.RELEASING) {
-            mapper.touch(identifier.type().getCode(), identifier.value(), userId.value(), to.getCode());   // 忽略返回值
+            // 重复的 beginRelease 说明释放仍在进行，刷新 updated_at，避免被回收任务误回收。
+            // 条件里带了属主和状态，读写之间被改动时影响 0 行，所以忽略返回值
+            mapper.touch(identifier.type().getCode(), identifier.value(), userId.value(), to.getCode());
         }
     }
 
@@ -297,17 +296,15 @@ public class IdentityLookupGateway {
             return;
         }
         if (!Objects.equals(existing.getUserId(), userId.value())) {
-            // 由于lookup 业务端的入口只有插入和更新
-            // 所以该方法不会由于业务端传入参数错误而导致删除的IdentityIdentifier，不是当前user的，
-            // 出现二者不符，只能是并发问题，也就是IdentityIdentifier其实已经删除，又被其它user占用
-            // 所以此时认为该方法幂等，而不是抛出错误
-            return ;
+            // lookup 在业务侧的入口只有插入和状态更新，不会因为调用方传错参数而出现属主不符。
+            // 出现属主不符只能是并发导致：本用户的记录其实早已删除，标识又被其他用户占用。
+            // 补偿目标（我不再持有该标识）已经达成，视为幂等成功，而不是抛异常。
+            return;
         }
         if (existing.getStatus() != status.getCode()) {
             throw new InvalidIdentifierStatusException(identifier, IdentityLookupStatus.fromCode(existing.getStatus()));
         }
-        // 属主和状态都匹配却没删掉：说明读写之间被并发修改
-        // 自己的、状态也对，却没删掉：读写之间被并发改动，再删一次
+        // 属主和状态都匹配却没删掉：读写之间被并发改动，再删一次
         if (!tryDeleteIfMatch(identifier, userId, status)) {
             throw new ConcurrentModificationException("identity_lookup 并发修改，请重试");
         }
