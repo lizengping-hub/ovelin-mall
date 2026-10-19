@@ -48,7 +48,7 @@ import java.util.function.Predicate;
  * 只有 {@link #insertConfirmed} 要求加入调用方事务（MANDATORY）。
  * <p>
  * 除 {@link #findUserId} 外，所有状态变更方法都是幂等的：
- * 目标状态已达成且属于同一用户时直接成功；属于他人抛 {@link IdentifierNotOwnedByUserException}；
+ * 目标状态已达成且属于同一用户时直接成功；记录已属于其他用户时视为已完成（补偿目标已达成），直接返回
  * 状态不符合抛 {@link InvalidIdentifierStatusException}。
  */
 @Component
@@ -70,7 +70,7 @@ public class IdentityLookupGateway {
      *
      * @throws IdentifierNotOwnedByUserException 标识已被其他用户占用（任意状态）
      * @throws InvalidIdentifierStatusException  标识已是本用户的，但状态不是 RESERVED（已 ACTIVE / RELEASING）
-     * @throws IdentifierAlreadyTakenException   极端并发：插入冲突，但随后查不到冲突记录，重试插入仍然冲突
+     * @throws IdentifierAlreadyTakenException  upsert 后查不到记录（理论上不会发生）
      */
     @Transactional(propagation = Propagation.REQUIRES_NEW)
     public void reserve(IdentityIdentifier identifier, ShardedId userId) {
@@ -129,12 +129,13 @@ public class IdentityLookupGateway {
     @Transactional(propagation = Propagation.REQUIRES_NEW)
     public void beginRelease(IdentityIdentifier identifier, ShardedId userId) {
         idempotentUpdateStatus(identifier, userId, IdentityLookupStatus.ACTIVE, IdentityLookupStatus.RELEASING);
+
     }
 
     /**
      * 完成释放：删除本用户的 RELEASING 记录。记录不存在视为幂等成功。
      *
-     * @throws IdentifierNotOwnedByUserException 记录属于其他用户
+     * 记录已属于其他用户时视为已完成（补偿目标已达成），直接返回
      * @throws InvalidIdentifierStatusException  记录不处于 RELEASING（必须先 {@link #beginRelease}）
      */
     @Transactional(propagation = Propagation.REQUIRES_NEW)
@@ -166,11 +167,11 @@ public class IdentityLookupGateway {
      * 已落库 → 补确认（ACTIVE）；未落库 → 删除占位。两种处理都只作用于仍为 RESERVED 的行。
      * 查询不带分片键，会广播到所有分片，仅用于后台任务。
      *
-     * @return 本次扫描到并处理的记录数
+     * @return 实际还原或删除的记录数
      */
     public int reclaimReservedStale(Duration olderThan, int limit, Predicate<PendingLookup> identityExists) {
         List<IdentityLookupPO> stale = mapper.selectStale(IdentityLookupStatus.RESERVED.getCode(), olderThan.getSeconds(), limit);
-        log.debug("Found reserved stale %d".formatted(stale.size()));
+        log.debug("Found reserved stale {}", stale.size());
         int handled = 0;
         for (IdentityLookupPO po : stale) {
             try {
@@ -197,11 +198,11 @@ public class IdentityLookupGateway {
                     ) == 1) handled ++;
                 }
             } catch (RuntimeException e){
-                log.error("ReclaimReservedStale error: ", e);
+                log.error("ReclaimReservedStale error of user {}: ",po.getUserId(), e);
             }
 
         }
-        log.debug("Resolve reserved stale %d".formatted(stale.size()));
+        log.debug("Resolve reserved stale {}", handled);
         return handled;
     }
 
@@ -212,11 +213,11 @@ public class IdentityLookupGateway {
      * 两种处理都只作用于仍为 RELEASING 的行。
      * 查询不带分片键，会广播到所有分片，仅用于后台任务。
      *
-     * @return 本次扫描到并处理的记录数
+     * @return 实际还原或删除的记录数
      */
     public int reclaimReleasingStale(Duration olderThan, int limit, Predicate<PendingLookup> identityExists) {
         List<IdentityLookupPO> stale = mapper.selectStale(IdentityLookupStatus.RELEASING.getCode(), olderThan.getSeconds(), limit);
-        log.debug("Found releasing stale %d".formatted(stale.size()));
+        log.debug("Found releasing stale {}", stale.size());
         int handled = 0;
         for (IdentityLookupPO po : stale) {
             try {
@@ -243,11 +244,11 @@ public class IdentityLookupGateway {
                     ) == 1) handled ++;
                 }
             } catch (RuntimeException e){
-                log.error("ReclaimReleasingStale error: ", e);
+                log.error("ReclaimReleasingStale error of user {}: ",po.getUserId(), e);
             }
 
         }
-        log.debug("Resolve releasing stale %d".formatted(stale.size()));
+        log.debug("Resolve releasing stale {}", handled);
         return handled;
     }
 
@@ -280,6 +281,10 @@ public class IdentityLookupGateway {
 
         requireExisting(identifier, userId, to, existing);
         // 记录属于当前用户，且已经处于目标状态：幂等成功
+
+        if (to == IdentityLookupStatus.RELEASING) {
+            mapper.touch(identifier.type().getCode(), identifier.value(), userId.value(), to.getCode());   // 忽略返回值
+        }
     }
 
     private void idempotentDelete(IdentityIdentifier identifier, ShardedId userId, IdentityLookupStatus status) {
@@ -295,7 +300,7 @@ public class IdentityLookupGateway {
             // 由于lookup 业务端的入口只有插入和更新
             // 所以该方法不会由于业务端传入参数错误而导致删除的IdentityIdentifier，不是当前user的，
             // 出现二者不符，只能是并发问题，也就是IdentityIdentifier其实已经删除，又被其它user占用
-            // 所以此时任务该方法幂等，而不是抛出错误
+            // 所以此时认为该方法幂等，而不是抛出错误
             return ;
         }
         if (existing.getStatus() != status.getCode()) {

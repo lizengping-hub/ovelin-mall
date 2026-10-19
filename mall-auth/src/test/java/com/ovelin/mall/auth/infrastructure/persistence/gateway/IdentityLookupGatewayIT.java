@@ -89,7 +89,6 @@ class IdentityLookupGatewayIT {
             assertThat(gateway.findUserId(EMAIL_IDENTITY_IDENTIFIER)).isEmpty();
         }
 
-
         @Test
         @DisplayName("同一用户对同一标识在 RESERVED 期间重复 reserve，视为幂等成功")
         void reserveIsIdempotentForSameUserWhileReserved() {
@@ -104,7 +103,7 @@ class IdentityLookupGatewayIT {
         }
         @Test
         @DisplayName("相同值不同类型的身份可以同时占用")
-        void sameIdentifierButDifferentTypeIdAllowed() {
+        void sameValueWithDifferentTypeIsAllowed() {
             ShardedId userId = newUserId();
 
             gateway.reserve(EMAIL_IDENTITY_IDENTIFIER, userId);
@@ -320,8 +319,6 @@ class IdentityLookupGatewayIT {
             assertThat(gateway.findUserId(EMAIL_IDENTITY_IDENTIFIER)).isEmpty();
         }
 
-
-
         @Test
         @DisplayName("重复取消是幂等的")
         void cancelReserveIsIdempotent() {
@@ -369,8 +366,8 @@ class IdentityLookupGatewayIT {
         }
 
         @Test
-        @DisplayName("取消他人身份是被允许的，模拟的是当前取消已被执行，但身份又被他人占用到的场景")
-        void cancelReservationOfAnotherUserIsAllowed() {
+        @DisplayName("他人已持有该标识时，cancelReserve 视为已完成，且不影响他人记录")
+        void cancelReservationOfAnotherUserIsNoOp() {
             ShardedId first = newUserId();
             gateway.reserve(EMAIL_IDENTITY_IDENTIFIER, first);
 
@@ -379,9 +376,8 @@ class IdentityLookupGatewayIT {
             assertLookup(EMAIL_IDENTITY_IDENTIFIER, first, IdentityLookupStatus.RESERVED);
         }
 
-
         @Test
-        @DisplayName("取消他人已 ACTIVE 的记录被是被允许的，记录保持 ACTIVE 且仍属于原用户")
+        @DisplayName("取消他人已 ACTIVE 的记录是被允许的，记录保持 ACTIVE 且仍属于原用户")
         void cancelActiveRecordOfAnotherUserIsAllowed() {
             ShardedId first = newUserId();
             gateway.reserve(EMAIL_IDENTITY_IDENTIFIER, first);
@@ -514,8 +510,8 @@ class IdentityLookupGatewayIT {
         }
 
         @Test
-        @DisplayName("completeRelease 他人的 RELEASING 记录被允许，记录保持 RELEASING 且仍属于原用户")
-        void completeReleaseOnRecordOfAnotherUserIsAllowed() {
+        @DisplayName("他人已持有该标识时，completeReleas 视为已完成，且不影响他人记录")
+        void completeReleaseOnRecordOfAnotherUserIsNoOp() {
             ShardedId owner = newReleasingUser();
             gateway.completeRelease(EMAIL_IDENTITY_IDENTIFIER, newUserId());
 
@@ -740,6 +736,24 @@ class IdentityLookupGatewayIT {
             assertThat(handled).isEqualTo(total);
             assertThat(count()).isZero();
         }
+        @Test
+        @DisplayName("某一行的 identityExists 抛异常，不影响其他过期记录被回收")
+        void reclaimContinuesAfterPredicateThrowsForOneRow() {
+            gateway.reserve(EMAIL_IDENTITY_IDENTIFIER, newUserId());
+            gateway.reserve(ANOTHER_EMAIL_IDENTIFIER, newUserId());
+            backdateAll();
+
+            int handled = gateway.reclaimReservedStale(Duration.ofMinutes(30), 100, pending -> {
+                if (pending.identifier().value().equals(EMAIL_IDENTITY_IDENTIFIER.value())) {
+                    throw new IllegalStateException("模拟查询超时");
+                }
+                return false;
+            });
+
+            assertThat(handled).isEqualTo(1);
+            assertThat(count()).isEqualTo(1);                                   // 抛异常的那条保留
+            assertThat(selectByIdentifier(EMAIL_IDENTITY_IDENTIFIER)).isNotNull();
+        }
     }
 
     // =====================================================================
@@ -821,6 +835,24 @@ class IdentityLookupGatewayIT {
             assertThat(handled).isEqualTo(1);
             assertThat(count()).isEqualTo(1);
         }
+        @Test
+        @DisplayName("某一行的 identityExists 抛异常，不影响其他过期记录被回收")
+        void reclaimContinuesAfterPredicateThrowsForOneRow() {
+            gateway.reserve(EMAIL_IDENTITY_IDENTIFIER, newUserId());
+            gateway.reserve(ANOTHER_EMAIL_IDENTIFIER, newUserId());
+            backdateAll();
+
+            int handled = gateway.reclaimReleasingStale(Duration.ofMinutes(30), 100, pending -> {
+                if (pending.identifier().value().equals(EMAIL_IDENTITY_IDENTIFIER.value())) {
+                    throw new IllegalStateException("模拟查询超时");
+                }
+                return false;
+            });
+
+            assertThat(handled).isEqualTo(1);
+            assertThat(count()).isEqualTo(1);                                   // 抛异常的那条保留
+            assertThat(selectByIdentifier(EMAIL_IDENTITY_IDENTIFIER)).isNotNull();
+        }
     }
 
     // =====================================================================
@@ -844,7 +876,18 @@ class IdentityLookupGatewayIT {
             assertThat(handled).isZero();
             assertLookup(EMAIL_IDENTITY_IDENTIFIER, userId, IdentityLookupStatus.RELEASING);
         }
+        @Test
+        @DisplayName("记录已经是 RELEASING 时重复 beginRelease（重试），应刷新 updated_at，避免释放进行中被回收")
+        void idempotentBeginReleaseRefreshesUpdatedAt() {
+            ShardedId userId = newReleasingUser();
+            backdate(EMAIL_IDENTITY_IDENTIFIER);
 
+            gateway.beginRelease(EMAIL_IDENTITY_IDENTIFIER, userId);
+            int handled = gateway.reclaimReleasingStale(Duration.ofMinutes(30), 100, pending -> false);
+
+            assertThat(handled).isZero();
+            assertLookup(EMAIL_IDENTITY_IDENTIFIER, userId, IdentityLookupStatus.RELEASING);
+        }
         @Test
         @DisplayName("abortRelease 后再次 beginRelease，应重新计时而不是沿用旧的 updated_at")
         void secondBeginReleaseRefreshesUpdatedAt() {
@@ -1138,6 +1181,99 @@ class IdentityLookupGatewayIT {
             } finally {
                 pool.shutdownNow();
             }
+        }
+    }
+
+    // =====================================================================
+    // 13. 回收过程中数据被改动（ABA）
+    // =====================================================================
+    /**
+     * reclaim 的流程是：selectStale（选出过期记录）→ identityExists.test(...) → 带条件的 UPDATE/DELETE。
+     * identityExists 恰好在"选出"和"修改"之间执行，所以在这个回调里改数据，
+     * 就能确定性地复现"选出之后、修改之前记录被别人动过"的窗口，不需要线程和 sleep。
+     * 这组用例依赖 reclaim 的 UPDATE/DELETE 带上"updated_at 仍早于阈值"的条件；条件没加之前，ABA 用例会失败。
+     */
+    @Nested
+    @DisplayName("13. 回收过程中数据被改动（ABA 防护）")
+    class ReclaimRace {
+
+        @Test
+        @DisplayName("回收 RESERVED：判断期间同一用户重试 reserve（刷新了时间），占位不能被删除")
+        void reclaimDoesNotDeleteReservedThatWasRefreshedDuringCheck() {
+            ShardedId userId = newUserId();
+            gateway.reserve(EMAIL_IDENTITY_IDENTIFIER, userId);
+            backdate(EMAIL_IDENTITY_IDENTIFIER);
+
+            int handled = gateway.reclaimReservedStale(Duration.ofMinutes(30), 100, pending -> {
+                gateway.reserve(EMAIL_IDENTITY_IDENTIFIER, pending.userId());   // 用户重试，刷新 updated_at
+                return false;                                                   // 按旧判断，会走"删除占位"
+            });
+
+            assertThat(handled).isZero();
+            assertLookup(EMAIL_IDENTITY_IDENTIFIER, userId, IdentityLookupStatus.RESERVED);
+        }
+
+        @Test
+        @DisplayName("回收 RELEASING：判断期间同一用户 abortRelease 后又 beginRelease（状态和属主都没变，只有时间变了），记录不能被删除")
+        void reclaimDoesNotDeleteReleasingThatWasReReleasedDuringCheck() {
+            ShardedId userId = newReleasingUser();
+            backdate(EMAIL_IDENTITY_IDENTIFIER);
+
+            int handled = gateway.reclaimReleasingStale(Duration.ofMinutes(30), 100, pending -> {
+                gateway.abortRelease(EMAIL_IDENTITY_IDENTIFIER, pending.userId());
+                gateway.beginRelease(EMAIL_IDENTITY_IDENTIFIER, pending.userId());   // RELEASING → ACTIVE → RELEASING
+                return false;
+            });
+
+            assertThat(handled).isZero();
+            assertLookup(EMAIL_IDENTITY_IDENTIFIER, userId, IdentityLookupStatus.RELEASING);
+        }
+
+        @Test
+        @DisplayName("回收 RELEASING：判断期间又开始了新一轮释放，不能被还原为 ACTIVE（否则会打断正在进行的释放）")
+        void reclaimDoesNotRestoreReleasingThatWasReReleasedDuringCheck() {
+            ShardedId userId = newReleasingUser();
+            backdate(EMAIL_IDENTITY_IDENTIFIER);
+
+            int handled = gateway.reclaimReleasingStale(Duration.ofMinutes(30), 100, pending -> {
+                gateway.abortRelease(EMAIL_IDENTITY_IDENTIFIER, pending.userId());
+                gateway.beginRelease(EMAIL_IDENTITY_IDENTIFIER, pending.userId());
+                return true;                                                         // 按旧判断，会走"还原为 ACTIVE"
+            });
+
+            assertThat(handled).isZero();
+            assertLookup(EMAIL_IDENTITY_IDENTIFIER, userId, IdentityLookupStatus.RELEASING);
+        }
+
+        @Test
+        @DisplayName("回收 RESERVED：判断期间正常流程已 confirm，ACTIVE 记录不能被删除（状态条件兜底）")
+        void reclaimDoesNotDeleteReservedThatWasConfirmedDuringCheck() {
+            ShardedId userId = newUserId();
+            gateway.reserve(EMAIL_IDENTITY_IDENTIFIER, userId);
+            backdate(EMAIL_IDENTITY_IDENTIFIER);
+
+            int handled = gateway.reclaimReservedStale(Duration.ofMinutes(30), 100, pending -> {
+                gateway.confirm(EMAIL_IDENTITY_IDENTIFIER, pending.userId());
+                return false;
+            });
+
+            assertThat(handled).isZero();
+            assertThat(gateway.findUserId(EMAIL_IDENTITY_IDENTIFIER)).contains(userId);
+        }
+
+        @Test
+        @DisplayName("回收 RELEASING：判断期间正常流程已 abortRelease，ACTIVE 记录不能被删除（状态条件兜底）")
+        void reclaimDoesNotDeleteReleasingThatWasAbortedDuringCheck() {
+            ShardedId userId = newReleasingUser();
+            backdate(EMAIL_IDENTITY_IDENTIFIER);
+
+            int handled = gateway.reclaimReleasingStale(Duration.ofMinutes(30), 100, pending -> {
+                gateway.abortRelease(EMAIL_IDENTITY_IDENTIFIER, pending.userId());
+                return false;
+            });
+
+            assertThat(handled).isZero();
+            assertThat(gateway.findUserId(EMAIL_IDENTITY_IDENTIFIER)).contains(userId);
         }
     }
 

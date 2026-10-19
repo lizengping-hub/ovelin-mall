@@ -11,7 +11,7 @@ import org.apache.ibatis.annotations.*;
 import java.time.Instant;
 import java.util.List;
 
-/** 联合主键表，不继承 BaseMapper，全部手写 SQL。 */
+
 @Mapper
 public interface IdentityLookupMapper extends BaseMapper<IdentityLookupPO> {
 
@@ -58,7 +58,7 @@ public interface IdentityLookupMapper extends BaseMapper<IdentityLookupPO> {
             @Param("olderThanSeconds") long olderThanSeconds
     );
 
-    @Update("""
+    @Delete("""
             DELETE FROM identity_lookup
             WHERE identity_type = #{identityType} AND identifier = #{identifier}
               AND user_id = #{userId} AND status = #{status}
@@ -72,7 +72,17 @@ public interface IdentityLookupMapper extends BaseMapper<IdentityLookupPO> {
             @Param("olderThanSeconds") long olderThanSeconds
     );
 
-
+    @Update("""
+            UPDATE identity_lookup SET updated_at = NOW(3)
+            WHERE identity_type = #{identityType} AND identifier = #{identifier}
+              AND user_id = #{userId} AND status = #{status}
+            """)
+    int touch(
+            @Param("identityType") String identityType,
+            @Param("identifier") String identifier,
+            @Param("userId") Long userId,
+            @Param("status") int status
+    );
 
     default int transition(String type, String identifier, long userId, IdentityLookupStatus from, IdentityLookupStatus to) {
         return this.update(null, Wrappers.<IdentityLookupPO>lambdaUpdate()
@@ -93,6 +103,7 @@ public interface IdentityLookupMapper extends BaseMapper<IdentityLookupPO> {
             FROM identity_lookup
             WHERE status = #{status}
                 AND updated_at < DATE_SUB(NOW(3), INTERVAL #{olderThanSeconds} SECOND)
+            ORDER BY updated_at
             LIMIT #{limit}
             """)
     List<IdentityLookupPO> selectStale(
@@ -106,13 +117,5 @@ public interface IdentityLookupMapper extends BaseMapper<IdentityLookupPO> {
         return Wrappers.<IdentityLookupPO>lambdaQuery()
                 .eq(IdentityLookupPO::getIdentityType, type)
                 .eq(IdentityLookupPO::getIdentifier, identifier);
-    }
-    default int updateUpdatedTime(IdentityLookupPO po){
-        return this.update(null, Wrappers.<IdentityLookupPO>lambdaUpdate()
-                .set(IdentityLookupPO::getUpdatedAt, Instant.now())
-                .eq(IdentityLookupPO::getIdentityType, po.getIdentityType())
-                .eq(IdentityLookupPO::getIdentifier, po.getIdentifier())
-                .eq(IdentityLookupPO::getUserId, po.getUserId())
-                .eq(IdentityLookupPO::getStatus, po.getStatus()));
     }
 }
