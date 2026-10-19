@@ -116,4 +116,4 @@ rules:
         sharding_string_field_1: identifier
 
 props:
-  sql-show: true
+  sql-show: false

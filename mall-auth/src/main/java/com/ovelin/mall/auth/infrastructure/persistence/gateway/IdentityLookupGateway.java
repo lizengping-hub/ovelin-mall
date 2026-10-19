@@ -11,6 +11,8 @@ import com.ovelin.mall.auth.infrastructure.persistence.mapper.IdentityLookupMapp
 import com.ovelin.mall.auth.infrastructure.persistence.po.IdentityLookupPO;
 import com.ovelin.mall.common.sharding.core.ov.ShardedId;
 import lombok.RequiredArgsConstructor;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.dao.DuplicateKeyException;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Propagation;
@@ -26,55 +28,73 @@ import java.util.function.Predicate;
 /**
  * identity_lookup 的访问网关（infrastructure 内部，不对 domain / application 暴露）。
  * <p>
- * lookup 按 (identity_type, identifier) 哈希分片，与聚合（按 userId 分片）通常不在同一个库
+ * lookup 按 (identity_type, identifier) 哈希分片，与聚合（按 userId 分片）通常不在同一个库。
+ * 状态机：
+ * <pre>
+ *   (无) --reserve--> RESERVED --confirm--> ACTIVE --beginRelease--> RELEASING --completeRelease--> (删除)
+ *                        |                     ^                         |
+ *                  cancelReserve               +-------abortRelease------+
+ *                        v
+ *                     (删除)
+ * </pre>
  * <ol>
- *   <li>{@link #reserve}：INSERT PENDING，主键冲突即标识被占用</li>
+ *   <li>{@link #reserve}：INSERT RESERVED，主键冲突即标识被占用</li>
  *   <li>聚合落库成功后 {@link #confirm}；失败则 {@link #cancelReserve}</li>
- *   <li>进程崩溃遗留的 PENDING 由 {@link #reclaimReservedStale} 定时回收</li>
+ *   <li>进程崩溃遗留的 RESERVED 由 {@link #reclaimReservedStale} 定时回收，
+ *       遗留的 RELEASING 由 {@link #reclaimReleasingStale} 定时回收</li>
  * </ol>
- * reserve / confirm / release 各自独立提交（REQUIRES_NEW），不会被外层事务回滚带走，
- * 也不会被外层事务长时间持有行锁。
+ * reserve / confirm / cancelReserve / beginRelease / completeRelease / abortRelease 各自独立提交（REQUIRES_NEW），
+ * 不会被外层事务回滚带走，也不会被外层事务长时间持有行锁。
+ * 只有 {@link #insertConfirmed} 要求加入调用方事务（MANDATORY）。
+ * <p>
+ * 除 {@link #findUserId} 外，所有状态变更方法都是幂等的：
+ * 目标状态已达成且属于同一用户时直接成功；属于他人抛 {@link IdentifierNotOwnedByUserException}；
+ * 状态不符合抛 {@link InvalidIdentifierStatusException}。
  */
 @Component
 @RequiredArgsConstructor
 public class IdentityLookupGateway {
-
+    private static final Logger log = LoggerFactory.getLogger(IdentityLookupGateway.class);
     private final IdentityLookupMapper mapper;
 
-    /** 待回收的占位记录（identityType 为原始 code，由调用方自行转换） */
+    /** 待回收的占位记录（身份标识 + 持有者 userId，供回收任务判断身份行是否已落库） */
     public record PendingLookup(IdentityIdentifier identifier, ShardedId userId) {
     }
+
     //  ------------------------------------------------------------------  reserve
 
-
     /**
-     * 占位。同一用户对同一标识重复占位（重试）视为幂等成功。
-     * 注意，用户注册时重试和网路抖动都会产生不同的ID，除非在第一次请求时记录下用户的id
+     * 占位：INSERT RESERVED。同一用户对同一标识重复占位（重试）视为幂等成功。
+     * 注意：用户注册时的重试和网络抖动都会产生不同的 userId，除非在第一次请求时就记录下 userId，
+     * 否则重试会被当作"另一个用户"而被拒绝。
      *
-     * @throws IdentifierAlreadyTakenException 标识已被其他账号占用，自己抢占失败，但查不出这个身份，重新插入该身份又失败，发生极端并发
+     * @throws IdentifierNotOwnedByUserException 标识已被其他用户占用（任意状态）
+     * @throws InvalidIdentifierStatusException  标识已是本用户的，但状态不是 RESERVED（已 ACTIVE / RELEASING）
+     * @throws IdentifierAlreadyTakenException   极端并发：插入冲突，但随后查不到冲突记录，重试插入仍然冲突
      */
     @Transactional(propagation = Propagation.REQUIRES_NEW)
     public void reserve(IdentityIdentifier identifier, ShardedId userId) {
         idempotentInsert(identifier, userId, IdentityLookupStatus.RESERVED);
     }
 
-
     /**
-     * 确认：聚合落库成功后调用，PENDING → ACTIVE。已是本用户的 ACTIVE 视为幂等成功。
+     * 确认：聚合落库成功后调用，RESERVED → ACTIVE。已是本用户的 ACTIVE 视为幂等成功。
      *
-     * @throws IllegalStateException 占位已丢失（例如落库太慢被回收任务清理），调用方需让本次操作失败
+     * @throws IdentifierNotExistException       占位已丢失（例如落库太慢被回收任务清理），调用方需让本次操作失败
+     * @throws IdentifierNotOwnedByUserException 记录属于其他用户
+     * @throws InvalidIdentifierStatusException  记录处于 RELEASING
      */
     @Transactional(propagation = Propagation.REQUIRES_NEW)
     public void confirm(IdentityIdentifier identifier, ShardedId userId) {
-        idempotentUpdateStatus(identifier, userId,  IdentityLookupStatus.RESERVED, IdentityLookupStatus.ACTIVE);
+        idempotentUpdateStatus(identifier, userId, IdentityLookupStatus.RESERVED, IdentityLookupStatus.ACTIVE);
     }
 
     /**
-     * 同分片场景：在调用方事务内直接写入"已确认"的标识，随外层事务一起提交/回滚。
-     * 相当于 reserve + confirm 合并为一步，不产生 PENDING 记录。
-     * 调用方必须保证 lookup 与聚合路由到同一个库。
+     * 同分片场景：在调用方事务内直接写入"已确认"（ACTIVE）的标识，随外层事务一起提交/回滚。
+     * 相当于 reserve + confirm 合并为一步，不产生 RESERVED 记录。
+     * 调用方必须保证 lookup 与聚合路由到同一个库。非幂等：重复插入同一标识会失败。
      *
-     * @throws IdentifierAlreadyTakenException 标识已被占用
+     * @throws IdentifierAlreadyTakenException 标识已被占用（无论属于谁、处于什么状态）
      */
     @Transactional(propagation = Propagation.MANDATORY)
     public void insertConfirmed(IdentityIdentifier identifier, ShardedId userId) {
@@ -84,161 +104,235 @@ public class IdentityLookupGateway {
         }
         throw new IdentifierAlreadyTakenException(identifier);
     }
-    /** 取消抢占，用于抢占后其它事务失败回滚；或cancelReserve失败后的自动任务重试*/
+
+    /**
+     * 取消占位：删除本用户的 RESERVED 记录。用于占位后其它事务失败回滚，
+     * 或 cancelReserve 自身失败后由自动任务重试。记录不存在视为幂等成功。
+     *
+     * @throws IdentifierNotOwnedByUserException 记录属于其他用户
+     * @throws InvalidIdentifierStatusException  记录已 ACTIVE / RELEASING，不能当作占位取消
+     */
     @Transactional(propagation = Propagation.REQUIRES_NEW)
     public void cancelReserve(IdentityIdentifier identifier, ShardedId userId) {
         idempotentDelete(identifier, userId, IdentityLookupStatus.RESERVED);
     }
 
-
-
     //   ------------------------------------------------------------------    release
+
     /**
-     * 申请释放
-     * @param identifier
-     * @param userId
-     * @return
+     * 申请释放：ACTIVE → RELEASING（登录路由立即不可见）。已是本用户的 RELEASING 视为幂等成功。
+     *
+     * @throws IdentifierNotExistException       记录不存在
+     * @throws IdentifierNotOwnedByUserException 记录属于其他用户
+     * @throws InvalidIdentifierStatusException  记录仍是 RESERVED（尚未确认）
      */
     @Transactional(propagation = Propagation.REQUIRES_NEW)
-    public void beginRelease(IdentityIdentifier identifier, ShardedId userId){
+    public void beginRelease(IdentityIdentifier identifier, ShardedId userId) {
         idempotentUpdateStatus(identifier, userId, IdentityLookupStatus.ACTIVE, IdentityLookupStatus.RELEASING);
     }
-    /** 释放：补偿 / 解绑 / 注销时调用。只删除属于该用户的记录，不存在也不报错 */
+
+    /**
+     * 完成释放：删除本用户的 RELEASING 记录。记录不存在视为幂等成功。
+     *
+     * @throws IdentifierNotOwnedByUserException 记录属于其他用户
+     * @throws InvalidIdentifierStatusException  记录不处于 RELEASING（必须先 {@link #beginRelease}）
+     */
     @Transactional(propagation = Propagation.REQUIRES_NEW)
     public void completeRelease(IdentityIdentifier identifier, ShardedId userId) {
         idempotentDelete(identifier, userId, IdentityLookupStatus.RELEASING);
     }
+
+    /**
+     * 放弃释放（补偿）：RELEASING → ACTIVE，标识重新对登录路由可见。已是本用户的 ACTIVE 视为幂等成功。
+     *
+     * @throws IdentifierNotExistException       记录不存在
+     * @throws IdentifierNotOwnedByUserException 记录属于其他用户
+     * @throws InvalidIdentifierStatusException  记录仍是 RESERVED
+     */
     @Transactional(propagation = Propagation.REQUIRES_NEW)
-    public void abortRelease(IdentityIdentifier identifier, ShardedId userId){
+    public void abortRelease(IdentityIdentifier identifier, ShardedId userId) {
         idempotentUpdateStatus(identifier, userId, IdentityLookupStatus.RELEASING, IdentityLookupStatus.ACTIVE);
     }
 
-    /** 登录读路径：标识 → userId，只认已确认的记录 */
+    /** 登录读路径：标识 → userId，只认已确认（ACTIVE）的记录 */
     public Optional<ShardedId> findUserId(IdentityIdentifier identifier) {
         IdentityLookupPO po = mapper.selectActive(identifier.type().getCode(), identifier.value());
         return Optional.ofNullable(po).map(p -> ShardedId.fromId(p.getUserId()));
     }
 
     /**
-     * 回收崩溃遗留的 PENDING（供定时任务调用）。
-     * 对创建时间早于 olderThan 的 PENDING，交给 identityExists 判断身份行是否已落库：
-     * 已落库 → 补确认（ACTIVE）；未落库 → 删除占位。两种处理都只作用于仍为 PENDING 的行。
+     * 回收崩溃遗留的 RESERVED（供定时任务调用）。
+     * 对 updated_at 早于 olderThan 的 RESERVED，交给 identityExists 判断身份行是否已落库：
+     * 已落库 → 补确认（ACTIVE）；未落库 → 删除占位。两种处理都只作用于仍为 RESERVED 的行。
      * 查询不带分片键，会广播到所有分片，仅用于后台任务。
      *
-     * @return 本次处理的记录数
+     * @return 本次扫描到并处理的记录数
      */
     public int reclaimReservedStale(Duration olderThan, int limit, Predicate<PendingLookup> identityExists) {
-        List<IdentityLookupPO> stale = mapper.selectStale(IdentityLookupStatus.RESERVED, olderThan.getSeconds(), limit);
+        List<IdentityLookupPO> stale = mapper.selectStale(IdentityLookupStatus.RESERVED.getCode(), olderThan.getSeconds(), limit);
+        log.debug("Found reserved stale %d".formatted(stale.size()));
         int handled = 0;
         for (IdentityLookupPO po : stale) {
-            IdentityIdentifier identifier = IdentityIdentifierFactory.reconstitute(po.getIdentityType(), po.getIdentifier());
-            ShardedId userId = ShardedId.fromId(po.getUserId());
-            PendingLookup pending = new PendingLookup(identifier, userId);
+            try {
+                IdentityIdentifier identifier = IdentityIdentifierFactory.reconstitute(po.getIdentityType(), po.getIdentifier());
+                ShardedId userId = ShardedId.fromId(po.getUserId());
+                PendingLookup pending = new PendingLookup(identifier, userId);
 
-            if (identityExists.test(pending)) {
-                tryTransition(identifier, userId, IdentityLookupStatus.RESERVED, IdentityLookupStatus.ACTIVE);
-            } else {
-                tryDeleteIfMatch(identifier, userId, IdentityLookupStatus.RESERVED);
+                if (identityExists.test(pending)) {
+                    if (mapper.transitionIfStale(
+                            identifier.type().getCode(),
+                            identifier.value(),
+                            userId.value(),
+                            IdentityLookupStatus.RESERVED.getCode(),
+                            IdentityLookupStatus.ACTIVE.getCode(),
+                            olderThan.getSeconds()
+                    ) == 1) handled ++;
+                } else {
+                    if (mapper.deleteIfStale(
+                            identifier.type().getCode(),
+                            identifier.value(),
+                            userId.value(),
+                            IdentityLookupStatus.RESERVED.getCode(),
+                            olderThan.getSeconds()
+                    ) == 1) handled ++;
+                }
+            } catch (RuntimeException e){
+                log.error("ReclaimReservedStale error: ", e);
             }
-            handled++;
+
         }
+        log.debug("Resolve reserved stale %d".formatted(stale.size()));
         return handled;
     }
 
     /**
-     * 回收崩溃遗留的 RESERVED（供定时任务调用）。
-     * 对创建时间早于 olderThan 的 Releasing，交给 identityExists 判断身份行是否已落库：
-     * 已落库 → 补确认（ACTIVE）；未落库 → 删除占位。两种处理都只作用于仍为 RESERVED 的行。
+     * 回收崩溃遗留的 RELEASING（供定时任务调用）。
+     * 对 updated_at 早于 olderThan 的 RELEASING，交给 identityExists 判断身份行是否还在：
+     * 仍在（释放没有真正完成）→ 回滚为 ACTIVE；已不在（释放已完成，只差删除 lookup）→ 删除记录。
+     * 两种处理都只作用于仍为 RELEASING 的行。
      * 查询不带分片键，会广播到所有分片，仅用于后台任务。
      *
-     * @return 本次处理的记录数
+     * @return 本次扫描到并处理的记录数
      */
     public int reclaimReleasingStale(Duration olderThan, int limit, Predicate<PendingLookup> identityExists) {
-        List<IdentityLookupPO> stale = mapper.selectStale(IdentityLookupStatus.RELEASING, olderThan.getSeconds(), limit);
+        List<IdentityLookupPO> stale = mapper.selectStale(IdentityLookupStatus.RELEASING.getCode(), olderThan.getSeconds(), limit);
+        log.debug("Found releasing stale %d".formatted(stale.size()));
         int handled = 0;
         for (IdentityLookupPO po : stale) {
-            IdentityIdentifier identifier = IdentityIdentifierFactory.reconstitute(po.getIdentityType(), po.getIdentifier());
-            ShardedId userId = ShardedId.fromId(po.getUserId());
-            PendingLookup pending = new PendingLookup(identifier, userId);
+            try {
+                IdentityIdentifier identifier = IdentityIdentifierFactory.reconstitute(po.getIdentityType(), po.getIdentifier());
+                ShardedId userId = ShardedId.fromId(po.getUserId());
+                PendingLookup pending = new PendingLookup(identifier, userId);
 
-            if (identityExists.test(pending)) {
-                tryTransition(identifier, userId, IdentityLookupStatus.RELEASING, IdentityLookupStatus.ACTIVE);
-            } else {
-                tryDeleteIfMatch(identifier, userId, IdentityLookupStatus.RELEASING);
+                if (identityExists.test(pending)) {
+                    if (mapper.transitionIfStale(
+                            identifier.type().getCode(),
+                            identifier.value(),
+                            userId.value(),
+                            IdentityLookupStatus.RELEASING.getCode(),
+                            IdentityLookupStatus.ACTIVE.getCode(),
+                            olderThan.getSeconds()
+                    ) == 1) handled ++;
+                } else {
+                    if (mapper.deleteIfStale(
+                            identifier.type().getCode(),
+                            identifier.value(),
+                            userId.value(),
+                            IdentityLookupStatus.RELEASING.getCode(),
+                            olderThan.getSeconds()
+                    ) == 1) handled ++;
+                }
+            } catch (RuntimeException e){
+                log.error("ReclaimReleasingStale error: ", e);
             }
-            handled++;
+
         }
+        log.debug("Resolve releasing stale %d".formatted(stale.size()));
         return handled;
     }
 
     // -------------------------------- 内部，幂等操作
-    private void idempotentInsert(IdentityIdentifier identifier, ShardedId userId, IdentityLookupStatus status){
-        IdentityLookupPO po = newLookup(identifier, userId, status);
-        if (tryInsert(po)) {
-            return;
-        }
+
+    private void idempotentInsert(IdentityIdentifier identifier, ShardedId userId, IdentityLookupStatus status) {
+
+        mapper.insertOrTouch(identifier.type().getCode(), identifier.value(), userId.value(), status.getCode());
+        // 不要依赖返回的影响行数：JDBC 默认返回"匹配行数"，
+        // 别人的记录没被修改时也会返回 1，和"插入成功"分不开
         IdentityLookupPO existing = selectByIdentifier(identifier);
         if (existing == null) {
-            // 竞态：冲突方刚好被释放，重试一次
-            if (tryInsert(po)) {
-                return;
-            }
-            throw new IdentifierAlreadyTakenException(identifier);
+            throw new IdentifierAlreadyTakenException(identifier);   // 理论上不会发生
         }
-        requireExisting(identifier,  userId, status,existing);
+        requireExisting(identifier, userId, status, existing);
+        // 已存在的记录属于当前用户且已处于目标状态：幂等成功
     }
 
-    private void idempotentUpdateStatus(IdentityIdentifier identifier, ShardedId userId, IdentityLookupStatus from, IdentityLookupStatus to){
-        if (tryTransition(identifier, userId, from, to)){
+    private void idempotentUpdateStatus(IdentityIdentifier identifier, ShardedId userId, IdentityLookupStatus from, IdentityLookupStatus to) {
+        if (tryTransition(identifier, userId, from, to)) {
             // 直接成功返回
             return;
         }
         IdentityLookupPO existing = selectByIdentifier(identifier);
 
-        if (existing == null){
+        if (existing == null) {
+            // 数据已经不存在
             throw new IdentifierNotExistException(identifier);
         }
+
         requireExisting(identifier, userId, to, existing);
-        // 要修改的身份属于当前用户，且已经变成想要的状态
+        // 记录属于当前用户，且已经处于目标状态：幂等成功
     }
 
-    private void idempotentDelete(IdentityIdentifier identifier, ShardedId userId, IdentityLookupStatus status){
-        if (tryDeleteIfMatch(identifier, userId, status)){
+    private void idempotentDelete(IdentityIdentifier identifier, ShardedId userId, IdentityLookupStatus status) {
+        if (tryDeleteIfMatch(identifier, userId, status)) {
             return;
         }
         IdentityLookupPO existing = selectByIdentifier(identifier);
-        if (existing == null){
+        if (existing == null) {
             // 其实已删除
             return;
         }
-        requireExisting(identifier,  userId, status,existing);
+        if (!Objects.equals(existing.getUserId(), userId.value())) {
+            // 由于lookup 业务端的入口只有插入和更新
+            // 所以该方法不会由于业务端传入参数错误而导致删除的IdentityIdentifier，不是当前user的，
+            // 出现二者不符，只能是并发问题，也就是IdentityIdentifier其实已经删除，又被其它user占用
+            // 所以此时任务该方法幂等，而不是抛出错误
+            return ;
+        }
+        if (existing.getStatus() != status.getCode()) {
+            throw new InvalidIdentifierStatusException(identifier, IdentityLookupStatus.fromCode(existing.getStatus()));
+        }
         // 属主和状态都匹配却没删掉：说明读写之间被并发修改
-        throw new ConcurrentModificationException("identity_lookup 并发修改，请重试");
+        // 自己的、状态也对，却没删掉：读写之间被并发改动，再删一次
+        if (!tryDeleteIfMatch(identifier, userId, status)) {
+            throw new ConcurrentModificationException("identity_lookup 并发修改，请重试");
+        }
     }
 
-    private void requireExisting(IdentityIdentifier identifier,  ShardedId userId, IdentityLookupStatus status,IdentityLookupPO existing){
-        if (!Objects.equals(existing.getUserId(), userId.value())){
+    /** 校验已存在的记录属于该用户且处于期望状态，否则抛出对应异常。属主校验优先于状态校验 */
+    private void requireExisting(IdentityIdentifier identifier, ShardedId userId, IdentityLookupStatus status, IdentityLookupPO existing) {
+        if (!Objects.equals(existing.getUserId(), userId.value())) {
             throw new IdentifierNotOwnedByUserException(identifier, userId, existing.getUserId());
         }
-        if (existing.getStatus() != status.getCode()){
+        if (existing.getStatus() != status.getCode()) {
             throw new InvalidIdentifierStatusException(identifier, IdentityLookupStatus.fromCode(existing.getStatus()));
         }
     }
 
     // ------------------------------------------------------------------ 内部，简单操作
 
-    private IdentityLookupPO newLookup(IdentityIdentifier identifier, ShardedId userId, IdentityLookupStatus status){
+    private IdentityLookupPO newLookup(IdentityIdentifier identifier, ShardedId userId, IdentityLookupStatus status) {
         IdentityLookupPO po = new IdentityLookupPO();
         po.setIdentityType(identifier.type().getCode());
         po.setIdentifier(identifier.value());
         po.setUserId(userId.value());
         po.setStatus(status.getCode());
-        return  po;
+        return po;
     }
 
-    private IdentityLookupPO selectByIdentifier(IdentityIdentifier identifier){
+    private IdentityLookupPO selectByIdentifier(IdentityIdentifier identifier) {
         return mapper.selectByIdentifier(identifier.type().getCode(), identifier.value());
     }
+
     private boolean tryInsert(IdentityLookupPO po) {
         try {
             mapper.insert(po);
@@ -248,12 +342,11 @@ public class IdentityLookupGateway {
         }
     }
 
-
-    private boolean tryTransition(IdentityIdentifier identifier, ShardedId userId, IdentityLookupStatus from, IdentityLookupStatus to){
+    private boolean tryTransition(IdentityIdentifier identifier, ShardedId userId, IdentityLookupStatus from, IdentityLookupStatus to) {
         return mapper.transition(identifier.type().getCode(), identifier.value(), userId.value(), from, to) == 1;
     }
 
-    private boolean tryDeleteIfMatch(IdentityIdentifier identifier, ShardedId userId, IdentityLookupStatus status){
+    private boolean tryDeleteIfMatch(IdentityIdentifier identifier, ShardedId userId, IdentityLookupStatus status) {
         return mapper.deleteIfMatch(identifier.type().getCode(), identifier.value(), userId.value(), status) == 1;
     }
 

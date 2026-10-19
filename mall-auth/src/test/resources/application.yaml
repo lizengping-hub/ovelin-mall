@@ -1,8 +1,10 @@
 spring:
   application:
     name: mall-user
-id-generator:
-  allocation-size: 1000
+ovelin:
+  id-generator:
+    allocation-size: 1000
+    repository-type: memory
 
 logging:
   file:
