@@ -2,6 +2,7 @@ package com.ovelin.mall.auth.infrastructure.persistence.factory;
 
 import com.ovelin.mall.auth.application.port.AuthIdFactory;
 import com.ovelin.mall.auth.domain.model.enums.IdentityType;
+import com.ovelin.mall.auth.domain.model.identityIdentifier.IdentityIdentifier;
 import com.ovelin.mall.common.sharding.core.api.ShardResolver;
 import com.ovelin.mall.common.sharding.core.ov.ShardId;
 import com.ovelin.mall.common.sharding.core.ov.ShardedId;
@@ -24,8 +25,8 @@ public class ShardedAuthIdFactory implements AuthIdFactory {
     private final IdGenerator idGenerator;
 
     @Override
-    public ShardedId newUserId(IdentityType type, String normalizedIdentifier) {
-        ShardId shardId = shardResolver.resolve(type.getCode(), normalizedIdentifier);
+    public ShardedId newUserId(IdentityIdentifier identifier) {
+        ShardId shardId = shardResolver.resolve(identifier.type().getCode(), identifier.value());
         return next(USER, shardId);
     }
 

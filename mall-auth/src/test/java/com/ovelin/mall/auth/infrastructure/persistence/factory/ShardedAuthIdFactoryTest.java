@@ -1,12 +1,14 @@
 package com.ovelin.mall.auth.infrastructure.persistence.factory;
 
-import com.ovelin.mall.auth.domain.model.enums.IdentityType;
+import com.ovelin.mall.auth.domain.model.identityIdentifier.IdentityIdentifier;
+import com.ovelin.mall.auth.domain.model.identityIdentifier.PhoneIdentifier;
 import com.ovelin.mall.common.sharding.core.api.ShardResolver;
 import com.ovelin.mall.common.sharding.core.ov.ShardId;
 import com.ovelin.mall.common.sharding.core.ov.ShardedId;
 import com.ovelin.mall.id.generator.api.BusinessType;
 import com.ovelin.mall.id.generator.api.IdGenerationCommand;
 import com.ovelin.mall.id.generator.api.IdGenerator;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
@@ -29,23 +31,31 @@ class ShardedAuthIdFactoryTest {
     ShardedAuthIdFactory factory;
 
     @Test
-    void newUserId_使用标识哈希出的分片() {
+    @DisplayName("根据身份标识解析分片并生成用户 ID")
+    void newUserIdByIdentifierShard() {
         ShardId shard = ShardId.of(1);
+        IdentityIdentifier phoneIdentifier = PhoneIdentifier.parseRawInput("13800000000");
         ShardedId expected = mock(ShardedId.class);
-        when(shardResolver.resolve("phone", "13800000000")).thenReturn(shard);
+        when(shardResolver.resolve(phoneIdentifier.type().getCode(), phoneIdentifier.value())).thenReturn(shard);
         when(idGenerator.nextId(any())).thenReturn(expected);
 
-        ShardedId actual = factory.newUserId(IdentityType.PHONE, "13800000000");
+        ShardedId actual = factory.newUserId(phoneIdentifier);
 
         assertThat(actual).isSameAs(expected);
         ArgumentCaptor<IdGenerationCommand> captor = ArgumentCaptor.forClass(IdGenerationCommand.class);
         verify(idGenerator).nextId(captor.capture());
         assertThat(captor.getValue().businessType()).isEqualTo(new BusinessType("user"));
         assertThat(captor.getValue().shardId()).contains(shard);
+
+        verify(shardResolver).resolve(
+                phoneIdentifier.type().getCode(),
+                phoneIdentifier.value()
+        );
     }
 
     @Test
-    void newIdentityId_沿用用户所在分片() {
+    @DisplayName("生成身份 ID 时沿用用户所在分片")
+    void newIdentityIdByUserShard() {
         ShardId shard = ShardId.of(0);
         ShardedId userId = mock(ShardedId.class);
         when(userId.shardId()).thenReturn(shard);
@@ -56,6 +66,22 @@ class ShardedAuthIdFactoryTest {
         ArgumentCaptor<IdGenerationCommand> captor = ArgumentCaptor.forClass(IdGenerationCommand.class);
         verify(idGenerator).nextId(captor.capture());
         assertThat(captor.getValue().businessType()).isEqualTo(new BusinessType("user_identity"));
+        assertThat(captor.getValue().shardId()).contains(shard);
+    }
+
+    @Test
+    @DisplayName("生成 MFA 因子 ID 时沿用用户所在分片")
+    void newFactorIdByUserShard() {
+        ShardId shard = ShardId.of(0);
+        ShardedId userId = mock(ShardedId.class);
+        when(userId.shardId()).thenReturn(shard);
+        when(idGenerator.nextId(any())).thenReturn(mock(ShardedId.class));
+
+        factory.newFactorId(userId);
+
+        ArgumentCaptor<IdGenerationCommand> captor = ArgumentCaptor.forClass(IdGenerationCommand.class);
+        verify(idGenerator).nextId(captor.capture());
+        assertThat(captor.getValue().businessType()).isEqualTo(new BusinessType("user_mfa_factor"));
         assertThat(captor.getValue().shardId()).contains(shard);
     }
 }
