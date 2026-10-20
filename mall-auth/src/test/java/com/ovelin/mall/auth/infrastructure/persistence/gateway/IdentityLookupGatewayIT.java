@@ -30,6 +30,7 @@ import org.springframework.transaction.support.TransactionTemplate;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Optional;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.CountDownLatch;
@@ -71,6 +72,44 @@ class IdentityLookupGatewayIT {
         jdbc.update("DELETE FROM identity_lookup");
     }
 
+    // =====================================================================
+    // 1. findUserId
+    // =====================================================================
+    @Nested
+    @DisplayName("-1. 根据身份查询身份ID， findUserId")
+    class FindUserId{
+        @Test
+        @DisplayName("查询不存在的身份的id返回空")
+        void findUserIdOfIdentityNotExistReturnNull(){
+            assertThat(gateway.findUserId(EMAIL_IDENTITY_IDENTIFIER)).isEmpty();
+        }
+        @Test
+        @DisplayName("查询reserve 状态的存在的身份，无法获得用户id")
+        void findUserIdOfIdentityReservedReturnNull(){
+            IdentityLookupPO po = newEmailIdentityLookupPO();
+            po.setStatus(IdentityLookupStatus.RESERVED.getCode());
+            mapper.insert(po);
+            assertThat(gateway.findUserId(EMAIL_IDENTITY_IDENTIFIER)).isEmpty();
+        }
+
+        @Test
+        @DisplayName("查询active 状态的存在的身份，可以获得userId")
+        void findUserIdOfIdentityActiveReturnUserId(){
+            IdentityLookupPO po = newEmailIdentityLookupPO();
+            po.setStatus(IdentityLookupStatus.ACTIVE.getCode());
+            mapper.insert(po);
+            assertThat(gateway.findUserId(EMAIL_IDENTITY_IDENTIFIER)).contains(ShardedId.fromId(po.getUserId()));
+
+        }
+
+        private IdentityLookupPO newEmailIdentityLookupPO(){
+            IdentityLookupPO po = new IdentityLookupPO();
+            po.setUserId(newUserId().value());
+            po.setIdentityType(EMAIL_IDENTITY_IDENTIFIER.type().getCode());
+            po.setIdentifier(EMAIL_IDENTITY_IDENTIFIER.value());
+            return po;
+        }
+    }
     // =====================================================================
     // 0. reserve
     // =====================================================================
