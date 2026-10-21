@@ -44,7 +44,7 @@ public class MfaFactor {
             throw new IllegalStateException("该身份不能用于二次验证：必须是已验证的手机号或邮箱");
         }
         requireSameShard(id, identity.getUserId());
-        MfaFactorType type = identity.getType() == IdentityType.PHONE ? MfaFactorType.SMS : MfaFactorType.EMAIL;
+        MfaFactorType type = identity.type() == IdentityType.PHONE ? MfaFactorType.SMS : MfaFactorType.EMAIL;
         return new MfaFactor(id, identity.getUserId(), type, identity.getId(), null,
                 MfaFactorStatus.PENDING, null, null);
     }
@@ -66,7 +66,7 @@ public class MfaFactor {
     }
 
     private static void requireSameShard(ShardedId id, ShardedId userId) {
-        if (!id.shardId().equals(userId.shardId())) {
+        if (!id.hasSameShard(userId)) {
             throw new InvalidArgumentException("因子记录必须与用户落在同一分片");
         }
     }

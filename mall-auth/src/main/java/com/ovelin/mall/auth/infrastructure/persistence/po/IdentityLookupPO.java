@@ -27,4 +27,20 @@ public class IdentityLookupPO {
 
     @TableField(insertStrategy = FieldStrategy.NEVER, updateStrategy = FieldStrategy.NEVER)
     private Instant updatedAt;
+
+    @Override
+    public int hashCode(){
+        return toString().hashCode();
+    }
+    @Override
+    public boolean equals(Object o){
+        if (o instanceof IdentityLookupPO other){
+            return this.toString().equals(o.toString());
+        }
+        return false;
+    }
+    @Override
+    public String toString(){
+        return identityType+":"+identifier;
+    }
 }

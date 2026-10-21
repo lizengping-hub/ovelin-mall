@@ -1,9 +1,10 @@
 package com.ovelin.mall.auth.domain.model.aggregate;
 
-import com.ovelin.mall.auth.domain.model.enums.IdentityType;
+import com.ovelin.mall.auth.domain.exception.IdentifierAlreadyBindedException;
 import com.ovelin.mall.auth.domain.model.enums.MfaFactorType;
 import com.ovelin.mall.auth.domain.model.identityIdentifier.IdentityIdentifier;
 import com.ovelin.mall.common.exception.global.InvalidArgumentException;
+import com.ovelin.mall.common.exception.global.InvalidStatusException;
 import com.ovelin.mall.common.sharding.core.ov.ShardedId;
 import lombok.Getter;
 
@@ -71,7 +72,7 @@ public class LoginAccount {
     public UserIdentity bindIdentity(ShardedId identityId, IdentityIdentifier identityIdentifier) {
         UserIdentity identity = UserIdentity.register(identityId, userId, identityIdentifier);
         if (findIdentity(identityIdentifier).isPresent()) {
-            throw new IllegalStateException("该登录标识已绑定到当前账号");
+            throw new IdentifierAlreadyBindedException(identityIdentifier);
         }
         identities.add(identity);
         identityChanges.added(identity.getId(), identity);
@@ -100,7 +101,7 @@ public class LoginAccount {
     public void unbindIdentity(ShardedId identityId) {
         UserIdentity target = requireIdentity(identityId);
         if (identities.size() <= 1) {
-            throw new IllegalStateException("至少保留一个登录身份");
+            throw new InvalidArgumentException("至少保留一个登录身份");
         }
         for (MfaFactor factor : factors) {
             if (factor.references(identityId) && factor.disable()) {
@@ -119,7 +120,7 @@ public class LoginAccount {
         boolean exists = factors.stream()
                 .anyMatch(f -> f.references(identityId) && !f.isDisabled());
         if (exists) {
-            throw new IllegalStateException("该身份已存在未停用的二次验证因子");
+            throw new InvalidStatusException("该身份已存在未停用的二次验证因子");
         }
         MfaFactor factor = MfaFactor.forIdentity(factorId, identity);
         factors.add(factor);
@@ -141,7 +142,7 @@ public class LoginAccount {
             // 引用身份的因子：启用时身份必须仍然存在且已验证
             UserIdentity identity = requireIdentity(factor.getIdentityId());
             if (!identity.canReceiveCode()) {
-                throw new IllegalStateException("该身份不能用于二次验证：必须是已验证的手机号或邮箱");
+                throw new InvalidStatusException("该身份不能用于二次验证：必须是已验证的手机号或邮箱");
             }
         }
         if (factor.enable(at)) {

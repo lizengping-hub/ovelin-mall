@@ -1,14 +1,16 @@
 package com.ovelin.mall.auth.domain.model.agregate;
 
+import com.ovelin.mall.auth.domain.exception.IdentifierAlreadyBindedException;
 import com.ovelin.mall.auth.domain.model.aggregate.LoginAccount;
 import com.ovelin.mall.auth.domain.model.aggregate.MfaFactor;
 import com.ovelin.mall.auth.domain.model.aggregate.UserIdentity;
-import com.ovelin.mall.auth.domain.model.enums.IdentityType;
 import com.ovelin.mall.auth.domain.model.enums.MfaFactorStatus;
 import com.ovelin.mall.auth.domain.model.enums.MfaFactorType;
 import com.ovelin.mall.auth.domain.model.identityIdentifier.IdentityIdentifier;
 import com.ovelin.mall.auth.domain.model.identityIdentifier.PhoneIdentifier;
+import com.ovelin.mall.auth.domain.model.identityIdentifier.UserNameIdentifier;
 import com.ovelin.mall.common.exception.global.InvalidArgumentException;
+import com.ovelin.mall.common.exception.global.InvalidStatusException;
 import com.ovelin.mall.common.sharding.core.ov.ShardedId;
 
 import org.junit.jupiter.api.Nested;
@@ -24,7 +26,7 @@ class LoginAccountTest {
 
     private static final Instant NOW = Instant.parse("2026-10-14T00:00:00Z");
     private static final IdentityIdentifier PHONE_IDENTITY_IDENTIFIER = PhoneIdentifier.parseRawInput("13800000000");
-    private static final IdentityIdentifier USERNAME_IDENTITY_IDENTIFIER = PhoneIdentifier.parseRawInput("alice");
+    private static final IdentityIdentifier USERNAME_IDENTITY_IDENTIFIER = UserNameIdentifier.from("alice");
     private static final ShardedId USER = of(1, 100);
     private static final ShardedId USERNAME_ID = of(1, 101);
     private static final ShardedId PHONE_ID = of(1, 102);
@@ -89,7 +91,7 @@ class LoginAccountTest {
             LoginAccount account = persistedWithVerifiedPhone();
 
             assertThatThrownBy(() -> account.bindIdentity(EMAIL_ID, PHONE_IDENTITY_IDENTIFIER))
-                    .isInstanceOf(IllegalStateException.class);
+                    .isInstanceOf(IdentifierAlreadyBindedException.class);
         }
 
         @Test
@@ -156,7 +158,7 @@ class LoginAccountTest {
             LoginAccount account = persisted();
 
             assertThatThrownBy(() -> account.unbindIdentity(USERNAME_ID))
-                    .isInstanceOf(IllegalStateException.class);
+                    .isInstanceOf(InvalidArgumentException.class);
             assertThat(account.getIdentities()).hasSize(1);
         }
 
@@ -233,7 +235,7 @@ class LoginAccountTest {
             account.addIdentityFactor(FACTOR_1, PHONE_ID);
 
             assertThatThrownBy(() -> account.addIdentityFactor(FACTOR_2, PHONE_ID))
-                    .isInstanceOf(IllegalStateException.class);
+                    .isInstanceOf(InvalidStatusException.class);
 
             account.disableFactor(FACTOR_1);
             assertThat(account.addIdentityFactor(FACTOR_2, PHONE_ID).getId()).isEqualTo(FACTOR_2);
