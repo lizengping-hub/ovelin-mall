@@ -30,7 +30,6 @@ import org.springframework.transaction.support.TransactionTemplate;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Optional;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.CountDownLatch;
@@ -173,7 +172,7 @@ class IdentityLookupGatewayIT {
         @Test
         @DisplayName("标识 RELEASING 时，同一用户重新 reserve 被拒绝，状态保持 RELEASING")
         void reserveReleasingIdentifierIsRejectedAndKeepsReleasing() {
-            ShardedId userId = newReleasingUser();
+            ShardedId userId = newReleasingIdentifier();
 
             assertThatThrownBy(() -> gateway.reserve(EMAIL_IDENTITY_IDENTIFIER, userId))
                     .isInstanceOf(InvalidIdentifierStatusException.class);
@@ -248,7 +247,7 @@ class IdentityLookupGatewayIT {
         @Test
         @DisplayName("对 RELEASING 的记录 confirm 被拒绝，状态保持 RELEASING")
         void confirmReleasingIdentifierIsRejected() {
-            ShardedId userId = newReleasingUser();
+            ShardedId userId = newReleasingIdentifier();
 
             assertThatThrownBy(() -> gateway.confirm(EMAIL_IDENTITY_IDENTIFIER, userId))
                     .isInstanceOf(InvalidIdentifierStatusException.class);
@@ -396,7 +395,7 @@ class IdentityLookupGatewayIT {
         @Test
         @DisplayName("标识 RELEASING 时，cancelReserve 被拒绝，记录保持 RELEASING")
         void cancelReserveOnReleasingIdentifierIsRejected() {
-            ShardedId userId = newReleasingUser();
+            ShardedId userId = newReleasingIdentifier();
 
             assertThatThrownBy(() -> gateway.cancelReserve(EMAIL_IDENTITY_IDENTIFIER, userId))
                     .isInstanceOf(InvalidIdentifierStatusException.class);
@@ -452,7 +451,7 @@ class IdentityLookupGatewayIT {
         @Test
         @DisplayName("beginRelease 是幂等的")
         void beginReleaseIsIdempotent() {
-            ShardedId userId = newReleasingUser();
+            ShardedId userId = newReleasingIdentifier();
 
             gateway.beginRelease(EMAIL_IDENTITY_IDENTIFIER, userId);
 
@@ -503,7 +502,7 @@ class IdentityLookupGatewayIT {
         @Test
         @DisplayName("completeRelease 后记录被删除，且不能路由到对应的 user")
         void completedReleaseDeletesRecord() {
-            ShardedId userId = newReleasingUser();
+            ShardedId userId = newReleasingIdentifier();
 
             gateway.completeRelease(EMAIL_IDENTITY_IDENTIFIER, userId);
 
@@ -514,7 +513,7 @@ class IdentityLookupGatewayIT {
         @Test
         @DisplayName("completeRelease 是幂等的")
         void completeReleaseIsIdempotent() {
-            ShardedId userId = newReleasingUser();
+            ShardedId userId = newReleasingIdentifier();
             gateway.completeRelease(EMAIL_IDENTITY_IDENTIFIER, userId);
 
             gateway.completeRelease(EMAIL_IDENTITY_IDENTIFIER, userId);
@@ -551,7 +550,7 @@ class IdentityLookupGatewayIT {
         @Test
         @DisplayName("他人已持有该标识且处于 RELEASING 时，completeRelease 视为已完成（幂等），他人的记录不受影响")
         void completeReleaseOnAnotherUsersReleasingRecordIsNoOp() {
-            ShardedId owner = newReleasingUser();
+            ShardedId owner = newReleasingIdentifier();
 
             gateway.completeRelease(EMAIL_IDENTITY_IDENTIFIER, newUserId());
 
@@ -593,7 +592,7 @@ class IdentityLookupGatewayIT {
         @Test
         @DisplayName("abortRelease 后，记录恢复 ACTIVE，可以查到并正常路由到用户")
         void abortedReleaseRestoresActiveAndRouting() {
-            ShardedId userId = newReleasingUser();
+            ShardedId userId = newReleasingIdentifier();
 
             gateway.abortRelease(EMAIL_IDENTITY_IDENTIFIER, userId);
 
@@ -604,7 +603,7 @@ class IdentityLookupGatewayIT {
         @Test
         @DisplayName("abortRelease 是幂等的")
         void abortReleaseIsIdempotent() {
-            ShardedId userId = newReleasingUser();
+            ShardedId userId = newReleasingIdentifier();
             gateway.abortRelease(EMAIL_IDENTITY_IDENTIFIER, userId);
 
             gateway.abortRelease(EMAIL_IDENTITY_IDENTIFIER, userId);
@@ -635,7 +634,7 @@ class IdentityLookupGatewayIT {
         @Test
         @DisplayName("abortRelease 他人处于 RELEASING 的记录被拒绝，记录保持 RELEASING 且仍属于原用户")
         void abortReleaseOnReleasingRecordOfAnotherUserIsRejected() {
-            ShardedId owner = newReleasingUser();
+            ShardedId owner = newReleasingIdentifier();
 
             assertThatThrownBy(() -> gateway.abortRelease(EMAIL_IDENTITY_IDENTIFIER, newUserId()))
                     .isInstanceOf(IdentifierNotOwnedByUserException.class);
@@ -668,7 +667,7 @@ class IdentityLookupGatewayIT {
         @Test
         @DisplayName("completeRelease 后，标识可以被新用户重新 reserve 并 confirm")
         void identifierCanBeReservedAgainAfterCompleteRelease() {
-            ShardedId first = newReleasingUser();
+            ShardedId first = newReleasingIdentifier();
             gateway.completeRelease(EMAIL_IDENTITY_IDENTIFIER, first);
 
             ShardedId second = newUserId();
@@ -745,7 +744,7 @@ class IdentityLookupGatewayIT {
         @Test
         @DisplayName("reclaimReservedStale 不处理过期的 RELEASING 记录")
         void reclaimReservedIgnoresStaleReleasing() {
-            ShardedId releasingUser = newReleasingUser();
+            ShardedId releasingUser = newReleasingIdentifier();
             backdate(EMAIL_IDENTITY_IDENTIFIER);
 
             int handled = gateway.reclaimReservedStale(Duration.ofMinutes(30), 100, pending -> false);
@@ -832,7 +831,7 @@ class IdentityLookupGatewayIT {
         @Test
         @DisplayName("过期的 RELEASING 记录在身份行不存在时，被 reclaimReleasingStale 删除（完成释放）")
         void reclaimCompletesReleaseWhenIdentityRowMissing() {
-            newReleasingUser();
+            newReleasingIdentifier();
             backdate(EMAIL_IDENTITY_IDENTIFIER);
 
             int handled = gateway.reclaimReleasingStale(Duration.ofMinutes(30), 100, pending -> false);
@@ -844,7 +843,7 @@ class IdentityLookupGatewayIT {
         @Test
         @DisplayName("过期的 RELEASING 记录在身份行仍存在时，被 reclaimReleasingStale 还原为 ACTIVE")
         void reclaimRestoresActiveWhenIdentityRowExists() {
-            ShardedId userId = newReleasingUser();
+            ShardedId userId = newReleasingIdentifier();
             backdate(EMAIL_IDENTITY_IDENTIFIER);
 
             int handled = gateway.reclaimReleasingStale(Duration.ofMinutes(30), 100, pending -> true);
@@ -889,7 +888,7 @@ class IdentityLookupGatewayIT {
         @Test
         @DisplayName("limit 生效：2 条过期记录、limit=1 时只处理 1 条")
         void reclaimRespectsLimit() {
-            newReleasingUser();
+            newReleasingIdentifier();
             ShardedId second = newUserId();
             gateway.reserve(ANOTHER_EMAIL_IDENTIFIER, second);
             gateway.confirm(ANOTHER_EMAIL_IDENTIFIER, second);
@@ -905,7 +904,7 @@ class IdentityLookupGatewayIT {
         @Test
         @DisplayName("某一条记录的 identityExists 抛异常，不影响其他过期 RELEASING 被回收")
         void reclaimContinuesAfterPredicateThrowsForOneRow() {
-            newReleasingUser();
+            newReleasingIdentifier();
             ShardedId second = newUserId();
             gateway.reserve(ANOTHER_EMAIL_IDENTIFIER, second);
             gateway.confirm(ANOTHER_EMAIL_IDENTIFIER, second);
@@ -951,7 +950,7 @@ class IdentityLookupGatewayIT {
         @Test
         @DisplayName("abortRelease 后再次 beginRelease，应重新计时而不是沿用旧的 updated_at")
         void secondBeginReleaseRefreshesUpdatedAt() {
-            ShardedId userId = newReleasingUser();
+            ShardedId userId = newReleasingIdentifier();
             gateway.abortRelease(EMAIL_IDENTITY_IDENTIFIER, userId);
             backdate(EMAIL_IDENTITY_IDENTIFIER);
 
@@ -965,7 +964,7 @@ class IdentityLookupGatewayIT {
         @Test
         @DisplayName("记录已经是 RELEASING 时重复 beginRelease（重试），应刷新 updated_at，避免释放进行中被回收")
         void idempotentBeginReleaseRefreshesUpdatedAt() {
-            ShardedId userId = newReleasingUser();
+            ShardedId userId = newReleasingIdentifier();
             backdate(EMAIL_IDENTITY_IDENTIFIER);
 
             gateway.beginRelease(EMAIL_IDENTITY_IDENTIFIER, userId);
@@ -1204,7 +1203,7 @@ class IdentityLookupGatewayIT {
         @RepeatedTest(10)
         @DisplayName("completeRelease 与回收任务（完成释放）并发处理同一条过期 RELEASING：都不报错，记录最终被删除")
         void concurrentCompleteReleaseAndReclaimEndsDeleted() throws Exception {
-            ShardedId userId = newReleasingUser();
+            ShardedId userId = newReleasingIdentifier();
             backdate(EMAIL_IDENTITY_IDENTIFIER);
 
             List<Runnable> tasks = List.of(
@@ -1289,7 +1288,7 @@ class IdentityLookupGatewayIT {
         @Test
         @DisplayName("回收 RELEASING：判断期间同一用户 abortRelease 后又 beginRelease（状态和属主都没变，只有时间变了），记录不能被删除")
         void reclaimDoesNotDeleteReleasingThatWasReReleasedDuringCheck() {
-            ShardedId userId = newReleasingUser();
+            ShardedId userId = newReleasingIdentifier();
             backdate(EMAIL_IDENTITY_IDENTIFIER);
 
             int handled = gateway.reclaimReleasingStale(Duration.ofMinutes(30), 100, pending -> {
@@ -1305,7 +1304,7 @@ class IdentityLookupGatewayIT {
         @Test
         @DisplayName("回收 RELEASING：判断期间又开始了新一轮释放，不能被还原为 ACTIVE（否则会打断正在进行的释放）")
         void reclaimDoesNotRestoreReleasingThatWasReReleasedDuringCheck() {
-            ShardedId userId = newReleasingUser();
+            ShardedId userId = newReleasingIdentifier();
             backdate(EMAIL_IDENTITY_IDENTIFIER);
 
             int handled = gateway.reclaimReleasingStale(Duration.ofMinutes(30), 100, pending -> {
@@ -1337,7 +1336,7 @@ class IdentityLookupGatewayIT {
         @Test
         @DisplayName("回收 RELEASING：判断期间正常流程已 abortRelease，ACTIVE 记录不能被删除（状态条件兜底）")
         void reclaimDoesNotDeleteReleasingThatWasAbortedDuringCheck() {
-            ShardedId userId = newReleasingUser();
+            ShardedId userId = newReleasingIdentifier();
             backdate(EMAIL_IDENTITY_IDENTIFIER);
 
             int handled = gateway.reclaimReleasingStale(Duration.ofMinutes(30), 100, pending -> {
@@ -1367,7 +1366,7 @@ class IdentityLookupGatewayIT {
     }
 
     /** 造一条处于 RELEASING 的 EMAIL_IDENTITY_IDENTIFIER 记录，返回其属主 */
-    private ShardedId newReleasingUser() {
+    private ShardedId newReleasingIdentifier() {
         ShardedId userId = newUserId();
         gateway.reserve(EMAIL_IDENTITY_IDENTIFIER, userId);
         gateway.confirm(EMAIL_IDENTITY_IDENTIFIER, userId);
