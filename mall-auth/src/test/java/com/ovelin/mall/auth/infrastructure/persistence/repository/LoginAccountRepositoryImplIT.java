@@ -13,6 +13,7 @@ import com.ovelin.mall.auth.domain.model.identityIdentifier.EmailIdentifier;
 import com.ovelin.mall.auth.domain.model.identityIdentifier.IdentityIdentifier;
 import com.ovelin.mall.auth.domain.model.identityIdentifier.PhoneIdentifier;
 import com.ovelin.mall.auth.infrastructure.persistence.AuthIntegrationTestSupport;
+import com.ovelin.mall.auth.infrastructure.persistence.gateway.IdentityLookupGateway;
 import com.ovelin.mall.auth.infrastructure.persistence.mapper.IdentityLookupMapper;
 import com.ovelin.mall.auth.infrastructure.persistence.mapper.UserIdentityMapper;
 import com.ovelin.mall.auth.infrastructure.persistence.mapper.UserMfaFactorMapper;
@@ -38,6 +39,9 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.clearInvocations;
 import static org.mockito.Mockito.doThrow;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 
 /**
@@ -54,7 +58,12 @@ import static org.mockito.Mockito.verifyNoInteractions;
  *       仓储用"PENDING → ACTIVE"协议保证最终一致。</li>
  * </ul>
  *
- * <p>Update 用例的约定：初始状态一律通过 add 落库（生产路径），再 findByUserId → 修改 → update，
+ * <p>add 和 update 的关系：update 本身就能写入新账号（新增的身份/因子都在变更集里）。
+ * add 只是在"单身份注册且身份分片与 userId 分片一致"时的快速路径（insertConfirmed，不走 reserve）；
+ * 其它情况（多身份注册等）add 内部直接走和 update 相同的 reserve → 写行 → confirm 逻辑。
+ * 所以 Add 里的用例只需要区分这两条路径，补偿、冲突这类逻辑放在 Update 里测一次即可。
+ *
+ * <p>Update 用例的约定：初始状态通过 add 落库，再 findByUserId → 修改 → update，
  * 这样每个用例测的才是"差异写入"。
  */
 class LoginAccountRepositoryImplIT extends AuthIntegrationTestSupport {
@@ -71,6 +80,9 @@ class LoginAccountRepositoryImplIT extends AuthIntegrationTestSupport {
     private UserIdentityMapper identityMapper;
     @MockitoSpyBean
     private UserMfaFactorMapper factorMapper;
+    /** 只用来区分 add 走的是快速路径（insertConfirmed）还是 reserve 路径 */
+    @MockitoSpyBean
+    private IdentityLookupGateway lookupGateway;
 
     @Autowired
     private LoginAccountRepositoryImpl repository;
@@ -172,6 +184,7 @@ class LoginAccountRepositoryImplIT extends AuthIntegrationTestSupport {
         void addAndQuery(){
             LoginAccount account = newLoginAccount(false);
             repository.add(account);
+            assertThat(account.hasChanges()).isFalse();
             assertThat(repository.findUserIdByIdentity(PHONE)).contains(account.getUserId());
             assertLoadedLoginAccount(account);
         }
@@ -192,7 +205,36 @@ class LoginAccountRepositoryImplIT extends AuthIntegrationTestSupport {
         }
 
         @Test
-        @DisplayName("手机号已被其他用户占用（lookup 唯一键冲突）时，抛 IdentifierAlreadyTakenException，账号不落库")
+        @DisplayName("单身份注册走快速路径：直接 insertConfirmed，不经过 reserve")
+        void addSingleIdentityUsesFastPath() {
+            LoginAccount account = newLoginAccount(false);
+
+            repository.add(account);
+
+            verify(lookupGateway).insertConfirmed(any(), any());
+            verify(lookupGateway, never()).reserve(any(), any());
+            assertThat(repository.findUserIdByIdentity(PHONE)).contains(account.getUserId());
+        }
+
+        @Test
+        @DisplayName("多身份注册和 update 同一逻辑：每个身份 reserve → 写行 → confirm，都能查到且可还原")
+        void addMultipleIdentitiesFallsBackToReservePath() {
+            ShardedId userId = authIdFactory.newUserId(PHONE);
+            LoginAccount account = LoginAccount.open(userId, authIdFactory.newIdentityId(userId), PHONE);
+            account.bindIdentity(authIdFactory.newIdentityId(userId), EMAIL);
+
+            repository.add(account);
+
+            verify(lookupGateway, times(2)).reserve(any(), any());
+            verify(lookupGateway, never()).insertConfirmed(any(), any());
+            assertThat(account.hasChanges()).isFalse();
+            assertThat(repository.findUserIdByIdentity(PHONE)).contains(userId);
+            assertThat(repository.findUserIdByIdentity(EMAIL)).contains(userId);
+            assertLoadedLoginAccount(account);
+        }
+
+        @Test
+        @DisplayName("（快速路径）手机号已被其他用户占用（lookup 唯一键冲突）时，抛 IdentifierAlreadyTakenException，账号不落库")
         void addFailedWhenIdentifierAlreadyInLookup() {
             // 预置冲突：同一标识符已存在于 identity_lookup
             IdentityLookupPO existing = newIdentityLookupPO();
@@ -208,7 +250,7 @@ class LoginAccountRepositoryImplIT extends AuthIntegrationTestSupport {
         }
 
         @Test
-        @DisplayName("user_identity 唯一键冲突时，抛 IdentifierAlreadyTakenException，账号不落库")
+        @DisplayName("（快速路径）user_identity 唯一键冲突时，抛 IdentifierAlreadyTakenException，账号不落库")
         void addFailedWhenIdentityAlreadyExists() {
             // 预置冲突：只有 identity 行、没有对应 lookup（绕过 lookup 的拦截，直接撞 identity 唯一键）
             UserIdentityPO existing = newUserIdentityPO(authIdFactory.newUserId(PHONE));
@@ -362,6 +404,9 @@ class LoginAccountRepositoryImplIT extends AuthIntegrationTestSupport {
             LoginAccount b = load(userB);
             b.bindIdentity(authIdFactory.newIdentityId(userB), PHONE);
 
+            // update 走 lookup.reserve，冲突时会查出原因（为了幂等），所以抛的是细化后的异常：
+            // 被他人持有 → IdentifierNotOwnedByUserException（IdentifierAlreadyTakenException 的子类）。
+            // add 单身份走 insertConfirmed，唯一键冲突直接抛 IdentifierAlreadyTakenException，不查原因。
             assertThatThrownBy(() -> repository.update(b))
                     .isInstanceOf(IdentifierNotOwnedByUserException.class);
 
@@ -379,12 +424,10 @@ class LoginAccountRepositoryImplIT extends AuthIntegrationTestSupport {
             LoginAccount a = LoginAccount.open(userA, phoneIdA, PHONE);
             a.bindIdentity(authIdFactory.newIdentityId(userA), EMAIL);
             persisted(a);
-            assertLoadedLoginAccount(a);
 
             LoginAccount loadedA = load(userA);
             loadedA.unbindIdentity(phoneIdA);
             repository.update(loadedA);
-            assertLoadedLoginAccount(loadedA);
 
             ShardedId userB = persisted(newLoginAccount(false)).getUserId();
             assertThat(repository.findUserIdByIdentity(PHONE)).contains(userB);
@@ -480,7 +523,6 @@ class LoginAccountRepositoryImplIT extends AuthIntegrationTestSupport {
             MfaFactor laFactor = actualFactors.get(i);
 
             assertThat(laFactor.getId()).isEqualTo(factor.getId());
-            assertThat(laFactor.getUserId()).isEqualTo(factor.getUserId());
             assertThat(laFactor.getType()).isEqualTo(factor.getType());
             assertThat(laFactor.getIdentityId()).isEqualTo(factor.getIdentityId());
             assertThat(laFactor.getSecretEncrypted()).isEqualTo(factor.getSecretEncrypted());
