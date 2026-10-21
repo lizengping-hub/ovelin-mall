@@ -9,6 +9,7 @@ import com.ovelin.mall.auth.domain.model.identityIdentifier.IdentityIdentifier;
 import com.ovelin.mall.auth.domain.model.identityIdentifier.IdentityIdentifierFactory;
 import com.ovelin.mall.auth.infrastructure.persistence.mapper.IdentityLookupMapper;
 import com.ovelin.mall.auth.infrastructure.persistence.po.IdentityLookupPO;
+import com.ovelin.mall.common.exception.global.ConcurrentUpdateException;
 import com.ovelin.mall.common.sharding.core.ov.ShardedId;
 import lombok.RequiredArgsConstructor;
 import org.slf4j.Logger;
@@ -19,7 +20,6 @@ import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Duration;
-import java.util.ConcurrentModificationException;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
@@ -117,7 +117,7 @@ public class IdentityLookupGateway {
      * 记录不存在、或已被其他用户占用（说明本用户的占位早已被清理）都视为已完成，直接返回。
      *
      * @throws InvalidIdentifierStatusException 记录是本用户的，但已 ACTIVE / RELEASING，不能当作占位取消
-     * @throws ConcurrentModificationException  记录属主和状态都匹配，但重试删除仍未成功（读写之间被并发修改），调用方可重试
+     * @throws ConcurrentUpdateException  记录属主和状态都匹配，但重试删除仍未成功（读写之间被并发修改），调用方可重试
      */
     @Transactional(propagation = Propagation.REQUIRES_NEW)
     public void cancelReserve(IdentityIdentifier identifier, ShardedId userId) {
@@ -144,7 +144,7 @@ public class IdentityLookupGateway {
      * 记录不存在、或已被其他用户占用（说明本用户的记录早已删除）都视为已完成，直接返回。
      *
      * @throws InvalidIdentifierStatusException 记录是本用户的，但不处于 RELEASING（必须先 {@link #beginRelease}）
-     * @throws ConcurrentModificationException 记录属主和状态都匹配，但重试删除仍未成功（读写之间被并发修改），调用方可重试
+     * @throws ConcurrentUpdateException 记录属主和状态都匹配，但重试删除仍未成功（读写之间被并发修改），调用方可重试
      */
     @Transactional(propagation = Propagation.REQUIRES_NEW)
     public void completeRelease(IdentityIdentifier identifier, ShardedId userId) {
@@ -306,7 +306,7 @@ public class IdentityLookupGateway {
         }
         // 属主和状态都匹配却没删掉：读写之间被并发改动，再删一次
         if (!tryDeleteIfMatch(identifier, userId, status)) {
-            throw new ConcurrentModificationException("identity_lookup 并发修改，请重试");
+            throw new ConcurrentUpdateException("identity_lookup 并发修改，请重试");
         }
     }
 
