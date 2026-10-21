@@ -32,6 +32,7 @@ import java.time.Instant;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Optional;
+import java.util.concurrent.*;
 import java.util.function.Function;
 
 import static org.assertj.core.api.Assertions.*;
@@ -539,7 +540,40 @@ class LoginAccountRepositoryImplIT extends AuthIntegrationTestSupport {
             assertThat(repository.findUserIdByIdentity(EMAIL)).contains(userId);
         }
     }
+    @Test
+    @DisplayName("并发：两个账号同时绑定同一个手机号，只有一个成功，输家回滚且不影响赢家")
+    void concurrentBindSameIdentifier_onlyOneWins() throws Exception {
+        ShardedId userA = authIdFactory.newUserId(EmailIdentifier.from("a@example.com"));
+        persisted(LoginAccount.open(userA, authIdFactory.newIdentityId(userA), EmailIdentifier.from("a@example.com")));
+        ShardedId userB = authIdFactory.newUserId(EmailIdentifier.from("b@example.com"));
+        persisted(LoginAccount.open(userB, authIdFactory.newIdentityId(userB), EmailIdentifier.from("b@example.com")));
 
+        LoginAccount a = load(userA);
+        a.bindIdentity(authIdFactory.newIdentityId(userA), PHONE);
+        LoginAccount b = load(userB);
+        b.bindIdentity(authIdFactory.newIdentityId(userB), PHONE);
+
+        CyclicBarrier barrier = new CyclicBarrier(2);
+        ExecutorService pool = Executors.newFixedThreadPool(2);
+        List<Future<?>> futures = List.of(
+                pool.submit(() -> { barrier.await(); repository.update(a); return null; }),
+                pool.submit(() -> { barrier.await(); repository.update(b); return null; }));
+
+        int success = 0;
+        for (Future<?> f : futures) {
+            try { f.get(10, TimeUnit.SECONDS); success++; }
+            catch (ExecutionException e) {
+                assertThat(e.getCause()).isInstanceOf(IdentifierNotOwnedByUserException.class); // 含子类
+            }
+        }
+        pool.shutdown();
+
+        assertThat(success).isEqualTo(1);
+        ShardedId winner = repository.findUserIdByIdentity(PHONE).orElseThrow();
+        ShardedId loser = winner.equals(userA) ? userB : userA;
+        assertThat(load(winner).getIdentities()).hasSize(2);
+        assertThat(load(loser).getIdentities()).hasSize(1);   // 输家回滚
+    }
 
     // --------------------------------- private
     private LoginAccount newPhoneIdentityLoginAccount(){
