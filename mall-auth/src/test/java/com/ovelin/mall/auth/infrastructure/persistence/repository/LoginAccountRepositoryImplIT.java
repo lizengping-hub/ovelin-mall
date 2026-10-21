@@ -7,7 +7,6 @@ import com.ovelin.mall.auth.domain.model.aggregate.LoginAccount;
 import com.ovelin.mall.auth.domain.model.aggregate.MfaFactor;
 import com.ovelin.mall.auth.domain.model.aggregate.UserIdentity;
 import com.ovelin.mall.auth.domain.model.enums.IdentityLookupStatus;
-import com.ovelin.mall.auth.domain.model.enums.MfaFactorStatus;
 import com.ovelin.mall.auth.domain.model.enums.MfaFactorType;
 import com.ovelin.mall.auth.domain.model.identityIdentifier.EmailIdentifier;
 import com.ovelin.mall.auth.domain.model.identityIdentifier.IdentityIdentifier;
@@ -182,7 +181,7 @@ class LoginAccountRepositoryImplIT extends AuthIntegrationTestSupport {
         @Test
         @DisplayName("新增账号和查询")
         void addAndQuery(){
-            LoginAccount account = newLoginAccount(false);
+            LoginAccount account = newPhoneIdentityLoginAccount(false);
             repository.add(account);
             assertThat(account.hasChanges()).isFalse();
             assertThat(repository.findUserIdByIdentity(PHONE)).contains(account.getUserId());
@@ -191,14 +190,14 @@ class LoginAccountRepositoryImplIT extends AuthIntegrationTestSupport {
         @Test
         @DisplayName("新增账号和会清空变化记录")
         void addAndClearChanges(){
-            LoginAccount account = newLoginAccount(false);
+            LoginAccount account = newPhoneIdentityLoginAccount(false);
             repository.add(account);
             assertThat(account.hasChanges()).isFalse();
         }
         @Test
         @DisplayName("新增开启二次认证账号和查询")
         void addIncludeFactorAndQuery(){
-            LoginAccount account = newLoginAccount(true);
+            LoginAccount account = newPhoneIdentityLoginAccount(true);
             repository.add(account);
             assertThat(repository.findUserIdByIdentity(PHONE)).contains(account.getUserId());
             assertLoadedLoginAccount(account);
@@ -207,7 +206,7 @@ class LoginAccountRepositoryImplIT extends AuthIntegrationTestSupport {
         @Test
         @DisplayName("单身份注册走快速路径：直接 insertConfirmed，不经过 reserve")
         void addSingleIdentityUsesFastPath() {
-            LoginAccount account = newLoginAccount(false);
+            LoginAccount account = newPhoneIdentityLoginAccount(false);
 
             repository.add(account);
 
@@ -240,7 +239,7 @@ class LoginAccountRepositoryImplIT extends AuthIntegrationTestSupport {
             IdentityLookupPO existing = newIdentityLookupPO();
             identityLookupMapper.insert(existing);
 
-            LoginAccount account = newLoginAccount();
+            LoginAccount account = newPhoneIdentityLoginAccount();
 
             assertThatThrownBy(() -> repository.add(account))
                     .isInstanceOf(IdentifierAlreadyTakenException.class);
@@ -256,7 +255,7 @@ class LoginAccountRepositoryImplIT extends AuthIntegrationTestSupport {
             UserIdentityPO existing = newUserIdentityPO(authIdFactory.newUserId(PHONE));
             identityMapper.insert(existing);
 
-            LoginAccount account = newLoginAccount();
+            LoginAccount account = newPhoneIdentityLoginAccount();
 
             assertThatThrownBy(() -> repository.add(account))
                     .isInstanceOf(IdentifierAlreadyTakenException.class);
@@ -266,9 +265,9 @@ class LoginAccountRepositoryImplIT extends AuthIntegrationTestSupport {
         }
 
         @Test
-        @DisplayName("写入时出现非唯一键冲突的数据库异常（如超时），原样抛出，不被误译为已占用，且整体回滚")
+        @DisplayName("（快速路径）写入时出现非唯一键冲突的数据库异常（如超时），原样抛出，不被误译为已占用，且整体回滚")
         void addFailedWhenUnexpectedDataAccessException() {
-            LoginAccount account = newLoginAccount();
+            LoginAccount account = newPhoneIdentityLoginAccount();
             ShardedId userId = account.getUserId();
             RuntimeException timeout = new QueryTimeoutException("db timeout");
 
@@ -291,7 +290,7 @@ class LoginAccountRepositoryImplIT extends AuthIntegrationTestSupport {
         @Test
         @DisplayName("增量新增：已有账号追加身份和因子，新身份进入 lookup，整体可还原，变更集清空")
         void update_addIdentityAndFactor() {
-            ShardedId userId = persisted(newLoginAccount(false)).getUserId();
+            ShardedId userId = persisted(newPhoneIdentityLoginAccount(false)).getUserId();
 
             LoginAccount loaded = load(userId);
             ShardedId emailId = authIdFactory.newIdentityId(userId);
@@ -381,7 +380,7 @@ class LoginAccountRepositoryImplIT extends AuthIntegrationTestSupport {
         @Test
         @DisplayName("没有变更时 update 不碰数据库（identity / factor / lookup 都没有任何调用）")
         void update_noChanges_doesNotTouchDb() {
-            ShardedId userId = persisted(newLoginAccount(true)).getUserId();
+            ShardedId userId = persisted(newPhoneIdentityLoginAccount(true)).getUserId();
             LoginAccount loaded = load(userId);
             assertThat(loaded.hasChanges()).isFalse();
             clearInvocations(identityMapper, factorMapper, identityLookupMapper);
@@ -395,7 +394,7 @@ class LoginAccountRepositoryImplIT extends AuthIntegrationTestSupport {
         @DisplayName("已有账号绑定被他人占用的标识：抛 IdentifierAlreadyTakenException，双方数据和 lookup 都不变")
         void update_bindIdentifierTakenByOthers() {
             // 账号 A 占有 PHONE
-            ShardedId userA = persisted(newLoginAccount(false)).getUserId();
+            ShardedId userA = persisted(newPhoneIdentityLoginAccount(false)).getUserId();
 
             // 账号 B 只有 EMAIL
             ShardedId userB = authIdFactory.newUserId(EMAIL);
@@ -429,17 +428,26 @@ class LoginAccountRepositoryImplIT extends AuthIntegrationTestSupport {
             loadedA.unbindIdentity(phoneIdA);
             repository.update(loadedA);
 
-            ShardedId userB = persisted(newLoginAccount(false)).getUserId();
+            ShardedId userB = persisted(newPhoneIdentityLoginAccount(false)).getUserId();
             assertThat(repository.findUserIdByIdentity(PHONE)).contains(userB);
+        }
+
+        @Test
+        @DisplayName("reserve 抢占失败")
+        void aVoid(){
+
+            RuntimeException timeout = new QueryTimeoutException("db timeout");
+            doThrow(timeout).when(identityLookupMapper).insert(any(IdentityLookupPO.class));
+
         }
     }
 
 
     // --------------------------------- private
-    private LoginAccount newLoginAccount(){
-        return newLoginAccount(true);
+    private LoginAccount newPhoneIdentityLoginAccount(){
+        return newPhoneIdentityLoginAccount(true);
     }
-    private LoginAccount newLoginAccount(boolean addFactor){
+    private LoginAccount newPhoneIdentityLoginAccount(boolean addFactor){
         ShardedId userId = authIdFactory.newUserId(PHONE);
         ShardedId identityId = authIdFactory.newIdentityId(userId);
 
