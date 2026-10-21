@@ -11,7 +11,7 @@ import lombok.Getter;
 public class InvalidIdentifierStatusException extends AuthDomainException {
 
     public InvalidIdentifierStatusException(IdentityIdentifier identifier, IdentityLookupStatus status) {
-        super(AuthErrorCode.IDENTIFIER_ALREADY_TAKEN, "Invalid identity identifier status " + status.name() + " of " + identifier);
+        super(AuthErrorCode.INVALID_IDENTIFIER_STATUS, "Invalid identity identifier status " + status.name() + " of " + identifier);
     }
 
 }
