@@ -1,7 +1,6 @@
 package com.ovelin.mall.auth.infrastructure.persistence.convertor;
 
 import com.ovelin.mall.auth.domain.model.aggregate.UserIdentity;
-import com.ovelin.mall.auth.domain.model.enums.IdentityType;
 import com.ovelin.mall.auth.infrastructure.persistence.po.IdentityLookupPO;
 import com.ovelin.mall.auth.infrastructure.persistence.po.UserIdentityPO;
 import com.ovelin.mall.common.sharding.core.ov.ShardedId;
@@ -22,8 +21,8 @@ public final class UserIdentityPOConverter {
         UserIdentityPO po = new UserIdentityPO();
         po.setId(identity.getId().value());
         po.setUserId(identity.getUserId().value());
-        po.setIdentityType(identity.getType().getCode());
-        po.setIdentifier(identity.getIdentifier());
+        po.setIdentityType(identity.type().getCode());
+        po.setIdentifier(identity.value());
         po.setVerifiedAt(identity.getVerifiedAt());
         po.setLastLoginAt(identity.getLastLoginAt());
         return po;
@@ -31,8 +30,8 @@ public final class UserIdentityPOConverter {
 
     public static IdentityLookupPO toLookupPO(UserIdentity identity) {
         IdentityLookupPO po = new IdentityLookupPO();
-        po.setIdentityType(identity.getType().getCode());
-        po.setIdentifier(identity.getIdentifier());
+        po.setIdentityType(identity.type().getCode());
+        po.setIdentifier(identity.value());
         po.setUserId(identity.getUserId().value());
         return po;
     }

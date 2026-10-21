@@ -20,15 +20,15 @@ public class UserIdentity {
 
     private final ShardedId id;
     private final ShardedId userId;
-    private final IdentityIdentifier identityIdentifier;
+    private final IdentityIdentifier identifier;
     private Instant verifiedAt;
     private Instant lastLoginAt;
 
-    private UserIdentity(ShardedId id, ShardedId userId, IdentityIdentifier identityIdentifier,
+    private UserIdentity(ShardedId id, ShardedId userId, IdentityIdentifier identifier,
                          Instant verifiedAt, Instant lastLoginAt) {
         this.id = id;
         this.userId = userId;
-        this.identityIdentifier = identityIdentifier;
+        this.identifier = identifier;
         this.verifiedAt = verifiedAt;
         this.lastLoginAt = lastLoginAt;
     }
@@ -42,7 +42,7 @@ public class UserIdentity {
         Objects.requireNonNull(userId, "userId 不能为空");
         Objects.requireNonNull(identityIdentifier, "identityIdentifier 不能为空");
 
-        if (!id.shardId().equals(userId.shardId())) {
+        if (!id.hasSameShard(userId)) {
             throw new InvalidArgumentException("身份记录必须与用户落在同一分片");
         }
 
@@ -70,7 +70,7 @@ public class UserIdentity {
     }
 
     boolean matches(IdentityIdentifier identityIdentifier) {
-        return this.identityIdentifier.equals(identityIdentifier);
+        return this.identifier.equals(identityIdentifier);
     }
 
     public boolean isVerified() {
@@ -78,14 +78,14 @@ public class UserIdentity {
     }
 
     public boolean canReceiveCode() {
-        return identityIdentifier.type().canReceiveCode() && isVerified();
+        return identifier.type().canReceiveCode() && isVerified();
     }
 
-    public IdentityType getType(){
-        return this.identityIdentifier.type();
+    public String value(){
+        return identifier.value();
     }
-    public String getIdentifier(){
-        return identityIdentifier.value();
+    public IdentityType type(){
+        return this.identifier.type();
     }
 
 
