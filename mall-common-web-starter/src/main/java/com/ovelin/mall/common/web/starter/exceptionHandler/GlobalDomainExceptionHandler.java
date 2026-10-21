@@ -50,7 +50,7 @@ public class GlobalDomainExceptionHandler {
     private String message(GlobalErrorCode code, GlobalDomainException e){
         return switch (code) {
             case RESOURCE_NOT_FOUND -> "访问的资源不存在";     // 404
-            case INVALID_STATUS -> "当前数据状态不允许该操作";
+            case INVALID_STATUS -> e.getMessage();
             case CONCURRENT_UPDATE -> "数据已被修改，请刷新后重试";
             case INVALID_ARGUMENT -> e.getMessage();
         };

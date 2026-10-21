@@ -10,7 +10,7 @@ import com.ovelin.mall.common.exception.global.face.GlobalErrorCode;
 public class ConcurrentUpdateException extends GlobalDomainException {
     /**
      *
-     * @param message 内部错误信息，外部信息使用GlobalErrorCode.CONCURRENT_UPDATE.clientMessage
+     * @param message 内部错误信息
      */
     public ConcurrentUpdateException(String message) {
         super(GlobalErrorCode.CONCURRENT_UPDATE, message);
