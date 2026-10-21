@@ -1,5 +1,6 @@
 package com.ovelin.mall.auth.infrastructure.persistence.repository;
 
+import com.baomidou.mybatisplus.core.conditions.Wrapper;
 import com.ovelin.mall.auth.application.port.AuthIdFactory;
 import com.ovelin.mall.auth.domain.exception.IdentifierAlreadyTakenException;
 import com.ovelin.mall.auth.domain.exception.IdentifierNotOwnedByUserException;
@@ -33,15 +34,9 @@ import java.util.List;
 import java.util.Optional;
 import java.util.function.Function;
 
-import static org.assertj.core.api.Assertions.assertThat;
-import static org.assertj.core.api.Assertions.assertThatThrownBy;
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.Mockito.clearInvocations;
-import static org.mockito.Mockito.doThrow;
-import static org.mockito.Mockito.never;
-import static org.mockito.Mockito.times;
-import static org.mockito.Mockito.verify;
-import static org.mockito.Mockito.verifyNoInteractions;
+import static org.assertj.core.api.Assertions.*;
+import static org.mockito.ArgumentMatchers.*;
+import static org.mockito.Mockito.*;
 
 /**
  * LoginAccountRepositoryImpl 集成测试。
@@ -185,7 +180,7 @@ class LoginAccountRepositoryImplIT extends AuthIntegrationTestSupport {
             repository.add(account);
             assertThat(account.hasChanges()).isFalse();
             assertThat(repository.findUserIdByIdentity(PHONE)).contains(account.getUserId());
-            assertLoadedLoginAccount(account);
+            loadAndAssertLoginAccount(account);
         }
         @Test
         @DisplayName("新增账号和会清空变化记录")
@@ -200,7 +195,7 @@ class LoginAccountRepositoryImplIT extends AuthIntegrationTestSupport {
             LoginAccount account = newPhoneIdentityLoginAccount(true);
             repository.add(account);
             assertThat(repository.findUserIdByIdentity(PHONE)).contains(account.getUserId());
-            assertLoadedLoginAccount(account);
+            loadAndAssertLoginAccount(account);
         }
 
         @Test
@@ -229,7 +224,7 @@ class LoginAccountRepositoryImplIT extends AuthIntegrationTestSupport {
             assertThat(account.hasChanges()).isFalse();
             assertThat(repository.findUserIdByIdentity(PHONE)).contains(userId);
             assertThat(repository.findUserIdByIdentity(EMAIL)).contains(userId);
-            assertLoadedLoginAccount(account);
+            loadAndAssertLoginAccount(account);
         }
 
         @Test
@@ -304,7 +299,7 @@ class LoginAccountRepositoryImplIT extends AuthIntegrationTestSupport {
             assertThat(loaded.hasChanges()).isFalse();
             assertThat(repository.findUserIdByIdentity(PHONE)).contains(userId);
             assertThat(repository.findUserIdByIdentity(EMAIL)).contains(userId);
-            assertLoadedLoginAccount(loaded);
+            loadAndAssertLoginAccount(loaded);
         }
 
         /**
@@ -330,7 +325,7 @@ class LoginAccountRepositoryImplIT extends AuthIntegrationTestSupport {
             loaded.recordFactorUsed(factorId, base.plusSeconds(4));
             repository.update(loaded);
 
-            assertLoadedLoginAccount(loaded);
+            loadAndAssertLoginAccount(loaded);
         }
 
         @Test
@@ -355,7 +350,7 @@ class LoginAccountRepositoryImplIT extends AuthIntegrationTestSupport {
             assertThat(factorMapper.selectByUserId(userId.value())).isEmpty();
             assertThat(repository.findUserIdByIdentity(PHONE)).isEmpty();
             assertThat(repository.findUserIdByIdentity(EMAIL)).contains(userId);
-            assertLoadedLoginAccount(loaded);
+            loadAndAssertLoginAccount(loaded);
         }
 
         @Test
@@ -391,7 +386,7 @@ class LoginAccountRepositoryImplIT extends AuthIntegrationTestSupport {
         }
 
         @Test
-        @DisplayName("已有账号绑定被他人占用的标识：抛 IdentifierAlreadyTakenException，双方数据和 lookup 都不变")
+        @DisplayName("已有账号绑定被他人占用的标识：抛 IdentifierNotOwnedByUserException，双方数据和 lookup 都不变")
         void update_bindIdentifierTakenByOthers() {
             // 账号 A 占有 PHONE
             ShardedId userA = persisted(newPhoneIdentityLoginAccount(false)).getUserId();
@@ -434,11 +429,119 @@ class LoginAccountRepositoryImplIT extends AuthIntegrationTestSupport {
 
         @Test
         @DisplayName("reserve 抢占失败")
-        void aVoid(){
+        void reserveFailure(){
+            ShardedId userId = persisted(newPhoneIdentityLoginAccount()).getUserId();
+
+            LoginAccount updateAccount = load(userId);
+            updateAccount.bindIdentity(authIdFactory.newIdentityId(userId), EMAIL);
 
             RuntimeException timeout = new QueryTimeoutException("db timeout");
-            doThrow(timeout).when(identityLookupMapper).insert(any(IdentityLookupPO.class));
+            doThrow(timeout).when(identityLookupMapper).insertOrTouch(anyString(), anyString(), anyLong(), anyInt());
+            clearInvocations(lookupGateway,identityMapper);
+            assertThatThrownBy(()->repository.update(updateAccount)).isInstanceOf(QueryTimeoutException.class);
+            assertThat(updateAccount.hasChanges()).isTrue();
+            assertThat(updateAccount.addedIdentities()).isNotEmpty();
+            verify(lookupGateway).reserve(EMAIL, userId);
+            verify(lookupGateway, never()).cancelReserve(EMAIL, userId);
+            verify(identityMapper, never()).insert(any(UserIdentityPO.class));
 
+            assertThat(identityMapper.selectByUserId(userId.value())).hasSize(1);
+        }
+        @Test
+        @DisplayName("reserve 抢占成功，但聚合插入失败；重试同一个账号对象成功")
+        void bindIdentityInsertFailed(){
+            ShardedId userId = persisted(newPhoneIdentityLoginAccount()).getUserId();
+
+            LoginAccount updateAccount = load(userId);
+            updateAccount.bindIdentity(authIdFactory.newIdentityId(userId), EMAIL);
+
+            RuntimeException timeout = new QueryTimeoutException("db timeout");
+            doThrow(timeout).when(identityMapper).insert(any(UserIdentityPO.class));
+            clearInvocations(lookupGateway,identityMapper);
+
+            assertThatThrownBy(()->repository.update(updateAccount)).isInstanceOf(QueryTimeoutException.class);
+            assertThat(updateAccount.hasChanges()).isTrue();
+            assertThat(updateAccount.addedIdentities()).isNotEmpty();
+
+            assertThat(lookupGateway.findUserId(EMAIL)).isEmpty();
+            verify(lookupGateway).reserve(EMAIL, userId);
+            verify(lookupGateway).cancelReserve(EMAIL, userId);
+            assertThat(identityMapper.selectByUserId(userId.value())).hasSize(1);
+
+            // 重试
+            reset(identityMapper);
+            repository.update(updateAccount);
+            assertThat(updateAccount.hasChanges()).isFalse();
+            assertThat(repository.findUserIdByIdentity(EMAIL)).contains(userId);
+            loadAndAssertLoginAccount(updateAccount);
+        }
+
+        @Test
+        @DisplayName("写入成功后 confirm 失败：update 不抛异常，lookup 停在 RESERVED，等待回收任务")
+        void confirmFailureAfterCommit() {
+            ShardedId userId = persisted(newPhoneIdentityLoginAccount()).getUserId();
+            LoginAccount account = load(userId);
+            account.bindIdentity(authIdFactory.newIdentityId(userId), EMAIL);
+
+            doThrow(new QueryTimeoutException("db timeout"))
+                    .when(lookupGateway).confirm(EMAIL, userId);
+
+            assertThatCode(() -> repository.update(account)).doesNotThrowAnyException();
+
+            assertThat(account.hasChanges()).isFalse();
+            assertThat(repository.findUserIdByIdentity(EMAIL)).isEmpty();           // RESERVED 查不到
+            assertThat(identityMapper.selectByUserId(userId.value())).hasSize(2);   // 数据已提交
+            assertThat(repository.findUserIdByIdentity(PHONE)).isNotEmpty();           // RESERVED 查不到
+        }
+
+        @Test
+        @DisplayName("解绑时聚合删除失败：abortRelease 恢复，标识仍可路由，重试成功")
+        void unbindIdentityDeleteFailed() {
+            ShardedId userId = authIdFactory.newUserId(PHONE);
+            ShardedId phoneId = authIdFactory.newIdentityId(userId);
+            LoginAccount account = LoginAccount.open(userId, phoneId, PHONE);
+            account.bindIdentity(authIdFactory.newIdentityId(userId), EMAIL);
+            persisted(account);
+
+            LoginAccount loaded = load(userId);
+            loaded.unbindIdentity(phoneId);
+
+            doThrow(new QueryTimeoutException("db timeout"))
+                    .when(identityMapper).delete(any(Wrapper.class));   // com.baomidou.mybatisplus.core.conditions.Wrapper
+
+            assertThatThrownBy(() -> repository.update(loaded)).isInstanceOf(QueryTimeoutException.class);
+            assertThat(loaded.hasChanges()).isTrue();
+            assertThat(identityMapper.selectByUserId(userId.value())).hasSize(2);
+            assertThat(repository.findUserIdByIdentity(PHONE)).contains(userId);   // abortRelease 已恢复
+
+            reset(identityMapper);
+            repository.update(loaded);   // 重试
+
+            assertThat(loaded.hasChanges()).isFalse();
+            assertThat(repository.findUserIdByIdentity(PHONE)).isEmpty();
+            assertThat(repository.findUserIdByIdentity(EMAIL)).contains(userId);
+        }
+
+        @Test
+        @DisplayName("解绑后 completeRelease 失败：update 不抛异常，身份行已删，等待回收任务")
+        void completeReleaseFailureAfterCommit() {
+            ShardedId userId = authIdFactory.newUserId(PHONE);
+            ShardedId phoneId = authIdFactory.newIdentityId(userId);
+            LoginAccount account = LoginAccount.open(userId, phoneId, PHONE);
+            account.bindIdentity(authIdFactory.newIdentityId(userId), EMAIL);
+            persisted(account);
+
+            LoginAccount loaded = load(userId);
+            loaded.unbindIdentity(phoneId);
+            doThrow(new QueryTimeoutException("db timeout"))
+                    .when(lookupGateway).completeRelease(PHONE, userId);
+
+            assertThatCode(() -> repository.update(loaded)).doesNotThrowAnyException();
+
+            assertThat(loaded.hasChanges()).isFalse();
+            assertThat(repository.findUserIdByIdentity(PHONE)).isEmpty();
+            assertThat(identityMapper.selectByUserId(userId.value())).hasSize(1);   // 数据已提交
+            assertThat(repository.findUserIdByIdentity(EMAIL)).contains(userId);
         }
     }
 
@@ -502,7 +605,7 @@ class LoginAccountRepositoryImplIT extends AuthIntegrationTestSupport {
                 .toList();
     }
 
-    private void assertLoadedLoginAccount(LoginAccount account){
+    private void loadAndAssertLoginAccount(LoginAccount account){
 
         Optional<LoginAccount> loaded = repository.findByUserId(account.getUserId());
 

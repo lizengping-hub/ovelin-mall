@@ -106,4 +106,9 @@ public class MfaFactor {
     public boolean isDisabled() {
         return status == MfaFactorStatus.DISABLED;
     }
+
+    @Override
+    public String toString() {
+        return "MfaFactor[userId = %s, type = %s, identityId = %s, secretEncrypted = %s]".formatted(userId, type, identityId, secretEncrypted);
+    }
 }

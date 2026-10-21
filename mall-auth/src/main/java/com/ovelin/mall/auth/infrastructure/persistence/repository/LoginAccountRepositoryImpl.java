@@ -2,6 +2,7 @@ package com.ovelin.mall.auth.infrastructure.persistence.repository;
 
 import com.baomidou.mybatisplus.core.toolkit.Wrappers;
 import com.ovelin.mall.auth.domain.exception.IdentifierAlreadyTakenException;
+import com.ovelin.mall.auth.domain.exception.MfaFactorAlreadyExistException;
 import com.ovelin.mall.auth.domain.model.aggregate.LoginAccount;
 import com.ovelin.mall.auth.domain.model.aggregate.MfaFactor;
 import com.ovelin.mall.auth.domain.model.aggregate.UserIdentity;
@@ -31,6 +32,7 @@ import org.springframework.transaction.support.TransactionTemplate;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 /**
  * 保存流程：
@@ -122,6 +124,8 @@ public class LoginAccountRepositoryImpl implements LoginAccountRepository {
         ShardedId userId = account.getUserId();
         List<UserIdentity> reserved = new ArrayList<>();
         List<UserIdentity> releasing = new ArrayList<>();
+        // 事务同步回调注册之后，回滚补偿由回调的 afterCompletion 负责，catch 不再重复处理
+        AtomicBoolean callbacksRegistered = new AtomicBoolean(false);
         try {
             for (UserIdentity identity : account.addedIdentities()) {
                 lookup.reserve(identity.getIdentifier(), userId);
@@ -133,11 +137,15 @@ public class LoginAccountRepositoryImpl implements LoginAccountRepository {
             }
             tx.executeWithoutResult(status -> {
                 registerLookupCallbacks(reserved, releasing, userId);
+                callbacksRegistered.set(true);
                 writeRows(account);
             });
         } catch (RuntimeException e) {
-            // 幂等：回滚回调也会释放，这里兜住"事务都没能开始"的情况
-            registerLookupAbort(reserved, releasing, userId);
+            // 回调还没注册的失败（reserve / beginRelease 中途失败、事务没能开始）只能在这里补偿；
+            // 回调已注册的，回滚时 afterCompletion 会处理，这里跳过，避免重复取消
+            if (!callbacksRegistered.get()) {
+                lookupAbort(reserved, releasing, userId);
+            }
             throw e;
         }
         account.clearChanges();
@@ -145,7 +153,7 @@ public class LoginAccountRepositoryImpl implements LoginAccountRepository {
     // ------------------------------------------------------------------ 落库（同分片本地事务内）
     private void insertRows(LoginAccount account){
         account.addedIdentities().forEach(this::insertIdentity);
-        account.addedFactors().forEach(f -> factorMapper.insert(MfaFactorPOConverter.toPO(f)));
+        account.addedFactors().forEach(this::insertFactor);
     }
     /** 顺序：因子删/改 → 身份删 → 身份改 → 身份增 → 因子增（因子引用的身份先于因子存在） */
     private void writeRows(LoginAccount account) {
@@ -153,8 +161,32 @@ public class LoginAccountRepositoryImpl implements LoginAccountRepository {
         account.dirtyFactors().forEach(this::updateFactor);
         account.removedIdentities().forEach(this::deleteIdentity);
         account.dirtyIdentities().forEach(this::updateIdentity);
-        account.addedIdentities().forEach(i -> identityMapper.insert(UserIdentityPOConverter.toPO(i)));
-        account.addedFactors().forEach(f -> factorMapper.insert(MfaFactorPOConverter.toPO(f)));
+        account.addedIdentities().forEach(i -> {
+            UserIdentityPO po = UserIdentityPOConverter.toPO(i);
+            try {
+                identityMapper.insert(po);
+            } catch (DuplicateKeyException e){
+                if (identityMapper.selectById(po.getId()) == null){
+                    // 如果不能查出来，说明被其它人抢占，一般不会到达
+                    throw new IdentifierAlreadyTakenException(i.getIdentifier());
+                }
+                // 能查到，视为幂等
+            }
+
+        });
+        account.addedFactors().forEach(f -> {
+            UserMfaFactorPO po = MfaFactorPOConverter.toPO(f);
+            try {
+                factorMapper.insert(po);
+            } catch (DuplicateKeyException e){
+                if (identityMapper.selectById(po.getId()) == null){
+                    // 如果不能查出来，说明被其它人抢占，一般不会到达
+                    throw new MfaFactorAlreadyExistException(f);
+                }
+                // 能查到，视为幂等
+            }
+
+        });
     }
 
     private void insertIdentity(UserIdentity userIdentity){
@@ -163,6 +195,15 @@ public class LoginAccountRepositoryImpl implements LoginAccountRepository {
             identityMapper.insert(po);
         } catch (DuplicateKeyException e){
             throw new IdentifierAlreadyTakenException(userIdentity.getIdentifier());
+        }
+    }
+
+    private void insertFactor(MfaFactor factor){
+        UserMfaFactorPO po = MfaFactorPOConverter.toPO(factor);
+        try {
+            factorMapper.insert(po);
+        } catch (DuplicateKeyException e){
+            throw new MfaFactorAlreadyExistException(factor);
         }
     }
 
@@ -200,7 +241,8 @@ public class LoginAccountRepositoryImpl implements LoginAccountRepository {
 
     // ------------------------------------------------------------------ lookup 确认 / 释放
 
-    private void registerLookupCallbacks(List<UserIdentity> reserved,  List<UserIdentity> releasing, ShardedId userId) {
+
+    private void registerLookupCallbacks(List<UserIdentity> reserved, List<UserIdentity> releasing, ShardedId userId) {
         if (reserved.isEmpty() && releasing.isEmpty()) {
             return;
         }
@@ -211,51 +253,50 @@ public class LoginAccountRepositoryImpl implements LoginAccountRepository {
                     try {
                         lookup.confirm(identity.getIdentifier(), userId);
                     } catch (RuntimeException e) {
-                        // 数据已提交，不能让调用方看到失败；遗留的 PENDING 由回收任务补确认
+                        // 数据已提交，不能让调用方看到失败；遗留的 RESERVED 由回收任务处理
                         log.error("identity_lookup 确认占用失败，等待回收任务处理 type={}", identity.type(), e);
                     }
                 }
-                for (UserIdentity identity : releasing){
+                for (UserIdentity identity : releasing) {
                     try {
                         lookup.completeRelease(identity.getIdentifier(), userId);
                     } catch (RuntimeException e) {
-                        // 数据已提交，不能让调用方看到失败；遗留的 PENDING 由回收任务补确认
+                        // 数据已提交，不能让调用方看到失败；遗留的 RELEASING 由回收任务处理
                         log.error("identity_lookup 完成释放失败，等待回收任务处理 type={}", identity.type(), e);
                     }
                 }
             }
 
+            /**
+             * 不能只靠 persistWithLookup 的 catch：save() 可能处在外层事务中，
+             * 外层事务在 save() 返回之后才回滚或提交失败，那时 catch 早已走完，只有这个回调能覆盖。
+             */
             @Override
             public void afterCompletion(int status) {
                 if (status != STATUS_COMMITTED) {
-                    registerLookupAbort(reserved, releasing, userId);
+                    lookupAbort(reserved, releasing, userId);
                 }
             }
         });
     }
-    private void registerLookupAbort(List<UserIdentity> reserved,  List<UserIdentity> releasing, ShardedId userId){
+
+    /** 事务未提交时的补偿：取消占位（RESERVED）、恢复释放（RELEASING）。幂等，可重复调用 */
+    private void lookupAbort(List<UserIdentity> reserved, List<UserIdentity> releasing, ShardedId userId) {
         for (UserIdentity identity : reserved) {
             try {
                 lookup.cancelReserve(identity.getIdentifier(), userId);
             } catch (RuntimeException e) {
-                // 数据已提交，不能让调用方看到失败；遗留的 PENDING 由回收任务补确认
-                log.error("identity_lookup 取消占用失败，等待回收任务处理 type={}", identity.type(), e);
+                // 补偿失败不能掩盖原始异常；遗留的 RESERVED 由回收任务处理
+                log.warn("identity_lookup 取消占用失败，等待回收任务处理 type={}", identity.type(), e);
             }
         }
-        for (UserIdentity identity : releasing){
+        for (UserIdentity identity : releasing) {
             try {
                 lookup.abortRelease(identity.getIdentifier(), userId);
             } catch (RuntimeException e) {
-                // 数据已提交，不能让调用方看到失败；遗留的 PENDING 由回收任务补确认
-                log.error("identity_lookup 取消释放释放失败，等待回收任务处理 type={}", identity.type(), e);
+                // 补偿失败不能掩盖原始异常；遗留的 RELEASING 由回收任务处理
+                log.warn("identity_lookup 取消释放失败，等待回收任务处理 type={}", identity.type(), e);
             }
-        }
-    }
-    private void releaseQuietly(UserIdentity identity, ShardedId userId) {
-        try {
-            lookup.cancelReserve(identity.getIdentifier(), userId);
-        } catch (RuntimeException e) {
-            log.warn("identity_lookup 释放失败，等待回收任务处理 type={}", identity.type(), e);
         }
     }
 
