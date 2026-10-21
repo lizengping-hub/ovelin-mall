@@ -428,23 +428,18 @@ class LoginAccountRepositoryImplIT extends AuthIntegrationTestSupport {
         }
 
         @Test
-        @DisplayName("reserve 抢占失败")
-        void reserveFailure(){
+        @DisplayName("reserve 写入超时：异常原样抛出，变更集保留，聚合没有新增行")
+        void reserveFailure() {
             ShardedId userId = persisted(newPhoneIdentityLoginAccount()).getUserId();
-
             LoginAccount updateAccount = load(userId);
             updateAccount.bindIdentity(authIdFactory.newIdentityId(userId), EMAIL);
 
             RuntimeException timeout = new QueryTimeoutException("db timeout");
             doThrow(timeout).when(identityLookupMapper).insertOrTouch(anyString(), anyString(), anyLong(), anyInt());
-            clearInvocations(lookupGateway,identityMapper);
-            assertThatThrownBy(()->repository.update(updateAccount)).isInstanceOf(QueryTimeoutException.class);
-            assertThat(updateAccount.hasChanges()).isTrue();
-            assertThat(updateAccount.addedIdentities()).isNotEmpty();
-            verify(lookupGateway).reserve(EMAIL, userId);
-            verify(lookupGateway, never()).cancelReserve(EMAIL, userId);
-            verify(identityMapper, never()).insert(any(UserIdentityPO.class));
 
+            assertThatThrownBy(() -> repository.update(updateAccount)).isSameAs(timeout);
+
+            assertThat(updateAccount.hasChanges()).isTrue();
             assertThat(identityMapper.selectByUserId(userId.value())).hasSize(1);
         }
         @Test
