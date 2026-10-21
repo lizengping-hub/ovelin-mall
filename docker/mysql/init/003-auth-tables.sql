@@ -104,6 +104,7 @@ BEGIN
                         'updated_at TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3)
                                 ON UPDATE CURRENT_TIMESTAMP(3),',
                         'PRIMARY KEY (id),',
+                        'UNIQUE KEY uk_identity_id (identity_id),',
                         'KEY idx_user_id (user_id)',
                         ') ENGINE = InnoDB
                               DEFAULT CHARSET = utf8mb4
