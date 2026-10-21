@@ -1,5 +1,6 @@
 package com.ovelin.mall.auth.infrastructure.persistence;
 
+import com.ovelin.mall.common.sharding.core.ov.ShardId;
 import com.ovelin.mall.common.sharding.core.ov.ShardedId;
 import com.ovelin.mall.id.generator.api.IdGenerationCommand;
 import com.ovelin.mall.id.generator.api.IdGenerator;
@@ -14,7 +15,7 @@ import java.util.List;
 
 @SpringBootTest
 public abstract class AuthIntegrationTestSupport {
-
+    private static final ShardId SHARD = ShardId.of(1);
     @Autowired
     protected JdbcTemplate jdbcTemplate;
 
@@ -27,7 +28,10 @@ public abstract class AuthIntegrationTestSupport {
             jdbcTemplate.update("delete from " + table);
         }
     }
-
+    /** 生成落在指定分片的 id，保证走分片路由时能解码出分片 */
+    protected ShardedId newId(String businessType) {
+        return idGenerator.nextId(IdGenerationCommand.builder(businessType).shardId(SHARD).build());
+    }
     /** 生成落在指定分片的 id，保证走分片路由时能解码出分片 */
     protected ShardedId newId(String businessType, int shard) {
         return idGenerator.nextId(IdGenerationCommand.builder(businessType).shardId(shard).build());

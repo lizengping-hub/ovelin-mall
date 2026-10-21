@@ -1,394 +1,494 @@
 package com.ovelin.mall.auth.infrastructure.persistence.repository;
 
+import com.ovelin.mall.auth.application.port.AuthIdFactory;
 import com.ovelin.mall.auth.domain.exception.IdentifierAlreadyTakenException;
+import com.ovelin.mall.auth.domain.exception.IdentifierNotOwnedByUserException;
 import com.ovelin.mall.auth.domain.model.aggregate.LoginAccount;
 import com.ovelin.mall.auth.domain.model.aggregate.MfaFactor;
 import com.ovelin.mall.auth.domain.model.aggregate.UserIdentity;
+import com.ovelin.mall.auth.domain.model.enums.IdentityLookupStatus;
 import com.ovelin.mall.auth.domain.model.enums.MfaFactorStatus;
 import com.ovelin.mall.auth.domain.model.enums.MfaFactorType;
 import com.ovelin.mall.auth.domain.model.identityIdentifier.EmailIdentifier;
 import com.ovelin.mall.auth.domain.model.identityIdentifier.IdentityIdentifier;
 import com.ovelin.mall.auth.domain.model.identityIdentifier.PhoneIdentifier;
 import com.ovelin.mall.auth.infrastructure.persistence.AuthIntegrationTestSupport;
+import com.ovelin.mall.auth.infrastructure.persistence.mapper.IdentityLookupMapper;
+import com.ovelin.mall.auth.infrastructure.persistence.mapper.UserIdentityMapper;
+import com.ovelin.mall.auth.infrastructure.persistence.mapper.UserMfaFactorMapper;
+import com.ovelin.mall.auth.infrastructure.persistence.po.IdentityLookupPO;
+import com.ovelin.mall.auth.infrastructure.persistence.po.UserIdentityPO;
+import com.ovelin.mall.auth.infrastructure.persistence.po.UserMfaFactorPO;
 import com.ovelin.mall.common.sharding.core.ov.ShardedId;
 import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.dao.QueryTimeoutException;
+import org.springframework.test.context.bean.override.mockito.MockitoSpyBean;
 
 import java.time.Instant;
+import java.util.Comparator;
+import java.util.List;
 import java.util.Optional;
+import java.util.function.Function;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.clearInvocations;
+import static org.mockito.Mockito.doThrow;
+import static org.mockito.Mockito.verifyNoInteractions;
 
 /**
  * LoginAccountRepositoryImpl 集成测试。
  *
+ * <p>仓储测试只关心"变更集 → SQL → 还原"这条映射，不重复验证 LoginAccount 的领域规则
+ * （比如解绑身份会停用关联因子，那是 LoginAccount 单元测试的事）。
+ *
  * <p>分片规则说明：
  * <ul>
- *   <li>注册时，userId 由 (identityType, identifier) 计算出的分片键生成，因此首次注册时所有数据（
- *       user_identity、identity_lookup）落在同一分片。</li>
+ *   <li>注册时，userId 由 (identityType, identifier) 计算出的分片键生成（authIdFactory.newUserId），
+ *       因此首次注册时 user_identity、identity_lookup 落在同一分片。</li>
  *   <li>identity_lookup 按 (identity_type, identifier) 分片，无法和其它表在同一本地事务中；
  *       仓储用"PENDING → ACTIVE"协议保证最终一致。</li>
  * </ul>
  *
- * <p>测试用 shard=0 生成 userId 和子实体 id，确保所有行都落在同一分片，从而让本地事务生效。
+ * <p>Update 用例的约定：初始状态一律通过 add 落库（生产路径），再 findByUserId → 修改 → update，
+ * 这样每个用例测的才是"差异写入"。
  */
 class LoginAccountRepositoryImplIT extends AuthIntegrationTestSupport {
 
-    private static final int SHARD = 0;
-
-    private static final IdentityIdentifier PHONE_IDENTITY_IDENTIFIER =
+    private static final IdentityIdentifier PHONE =
             PhoneIdentifier.parseRawInput("13800000001");
-    private static final IdentityIdentifier EMAIL_IDENTITY_IDENTIFIER =
+    private static final IdentityIdentifier EMAIL =
             EmailIdentifier.from("test@example.com");
+    @Autowired
+    AuthIdFactory authIdFactory;
+    @MockitoSpyBean
+    private IdentityLookupMapper identityLookupMapper;
+    @MockitoSpyBean
+    private UserIdentityMapper identityMapper;
+    @MockitoSpyBean
+    private UserMfaFactorMapper factorMapper;
 
     @Autowired
     private LoginAccountRepositoryImpl repository;
 
     // ------------------------------------------------------------------ findByUserId
 
-    @Test
-    @DisplayName("查询不存在的 userId 应返回空")
-    void findByUserId_userNotFound_returnsEmpty() {
-        ShardedId missingId = newId("user", SHARD);
+    @Nested
+    @DisplayName("0. 查询用户Id findUserIdByIdentity")
+    class FindUserIdByIdentity{
+        @Test
+        @DisplayName("查询不存在的身份的id返回空")
+        void findUserIdOfIdentityNotExistReturnNull(){
+            assertThat(repository.findUserIdByIdentity(PHONE)).isEmpty();
+        }
+        @Test
+        @DisplayName("查询reserve 状态的存在的身份，无法获得用户id")
+        void findUserIdOfIdentityReservedReturnNull(){
+            IdentityLookupPO po = newIdentityLookupPO();
+            po.setStatus(IdentityLookupStatus.RESERVED.getCode());
+            identityLookupMapper.insert(po);
 
-        Optional<LoginAccount> result = repository.findByUserId(missingId);
+            assertThat(repository.findUserIdByIdentity(PHONE)).isEmpty();
+        }
 
-        assertThat(result).isEmpty();
+        @Test
+        @DisplayName("查询active 状态的存在的身份，可以获得userId")
+        void findUserIdOfIdentityActiveReturnUserId(){
+            IdentityLookupPO po = newIdentityLookupPO();
+            po.setStatus(IdentityLookupStatus.ACTIVE.getCode());
+            identityLookupMapper.insert(po);
+            assertThat(repository.findUserIdByIdentity(PHONE)).contains(ShardedId.fromId(po.getUserId()));
+        }
+
+    }
+    @Nested
+    @DisplayName("1. 根据用户Id查询LoginAccount findByUserId")
+    class FindByUserId{
+        @Test
+        @DisplayName("查询不存在的 userId 应返回空")
+        void findByUserId_userNotFound_returnsEmpty() {
+            ShardedId missingId = newId("user");
+            assertThat(repository.findByUserId(missingId)).isEmpty();
+        }
+
+        @Test
+        @DisplayName("能够 还原Identities")
+        void findByUserId_getLoginAccountOfIdentities(){
+            ShardedId userId = newId("user");
+            UserIdentityPO ui = newUserIdentityPO(userId);
+            identityMapper.insert(ui);
+
+            Optional<LoginAccount> accountOptional = repository.findByUserId(userId);
+            assertThat(accountOptional).isPresent();
+            LoginAccount account = accountOptional.get();
+            // 只需检查有就行了，不需比较值
+            assertThat(account.getUserId()).isEqualTo(userId);
+            assertThat(account.getIdentities()).isNotEmpty();
+            assertThat(account.getFactors()).isEmpty();
+        }
+
+        @Test
+        @DisplayName("只有MfaFactors，不会还原")
+        void findByUserId_userNotFoundOnlyMfaFactors(){
+            ShardedId userId = newId("user");
+
+            UserMfaFactorPO umfa = newUserMfaFactorPO(userId);
+            factorMapper.insert(umfa);
+
+            assertThat(repository.findByUserId(userId)).isEmpty();
+        }
+
+
+        @Test
+        @DisplayName("能够 还原Factors")
+        void findByUserId_getLoginAccountOfMfaFactors(){
+            ShardedId userId = newId("user");
+            UserIdentityPO ui = newUserIdentityPO(userId);
+            identityMapper.insert(ui);
+
+            UserMfaFactorPO umfa = newUserMfaFactorPO(userId);
+            factorMapper.insert(umfa);
+
+            Optional<LoginAccount> accountOptional = repository.findByUserId(userId);
+            assertThat(accountOptional).isPresent();
+            LoginAccount account = accountOptional.get();
+            // 只需检查有就行了，不需比较值
+            assertThat(account.getUserId()).isEqualTo(userId);
+            assertThat(account.getIdentities()).isNotEmpty();
+            assertThat(account.getFactors()).isNotEmpty();
+        }
+
     }
 
-    @Test
-    @DisplayName("保存账号后能按 userId 还原出完整的身份信息")
-    void findByUserId_afterSave_reconstructsAccount() {
-        ShardedId userId = newId("user", SHARD);
-        ShardedId identityId = newId("user_identity", SHARD);
-        LoginAccount account = LoginAccount.open(userId, identityId, PHONE_IDENTITY_IDENTIFIER);
-        repository.update(account);
+    @Nested
+    @DisplayName("2. Add 新增")
+    class Add{
+        @Test
+        @DisplayName("新增账号和查询")
+        void addAndQuery(){
+            LoginAccount account = newLoginAccount(false);
+            repository.add(account);
+            assertThat(repository.findUserIdByIdentity(PHONE)).contains(account.getUserId());
+            assertLoadedLoginAccount(account);
+        }
+        @Test
+        @DisplayName("新增账号和会清空变化记录")
+        void addAndClearChanges(){
+            LoginAccount account = newLoginAccount(false);
+            repository.add(account);
+            assertThat(account.hasChanges()).isFalse();
+        }
+        @Test
+        @DisplayName("新增开启二次认证账号和查询")
+        void addIncludeFactorAndQuery(){
+            LoginAccount account = newLoginAccount(true);
+            repository.add(account);
+            assertThat(repository.findUserIdByIdentity(PHONE)).contains(account.getUserId());
+            assertLoadedLoginAccount(account);
+        }
 
-        Optional<LoginAccount> loaded = repository.findByUserId(userId);
+        @Test
+        @DisplayName("手机号已被其他用户占用（lookup 唯一键冲突）时，抛 IdentifierAlreadyTakenException，账号不落库")
+        void addFailedWhenIdentifierAlreadyInLookup() {
+            // 预置冲突：同一标识符已存在于 identity_lookup
+            IdentityLookupPO existing = newIdentityLookupPO();
+            identityLookupMapper.insert(existing);
+
+            LoginAccount account = newLoginAccount();
+
+            assertThatThrownBy(() -> repository.add(account))
+                    .isInstanceOf(IdentifierAlreadyTakenException.class);
+
+            // 整个事务回滚，账号不应落库
+            assertThat(repository.findByUserId(account.getUserId())).isEmpty();
+        }
+
+        @Test
+        @DisplayName("user_identity 唯一键冲突时，抛 IdentifierAlreadyTakenException，账号不落库")
+        void addFailedWhenIdentityAlreadyExists() {
+            // 预置冲突：只有 identity 行、没有对应 lookup（绕过 lookup 的拦截，直接撞 identity 唯一键）
+            UserIdentityPO existing = newUserIdentityPO(authIdFactory.newUserId(PHONE));
+            identityMapper.insert(existing);
+
+            LoginAccount account = newLoginAccount();
+
+            assertThatThrownBy(() -> repository.add(account))
+                    .isInstanceOf(IdentifierAlreadyTakenException.class);
+
+            // 整个事务回滚，包括 lookup 已写入的部分
+            assertThat(repository.findByUserId(account.getUserId())).isEmpty();
+        }
+
+        @Test
+        @DisplayName("写入时出现非唯一键冲突的数据库异常（如超时），原样抛出，不被误译为已占用，且整体回滚")
+        void addFailedWhenUnexpectedDataAccessException() {
+            LoginAccount account = newLoginAccount();
+            ShardedId userId = account.getUserId();
+            RuntimeException timeout = new QueryTimeoutException("db timeout");
+
+            // 在 lookup 写入处注入故障，模拟基础设施异常（真实环境无法稳定复现）
+            doThrow(timeout).when(identityLookupMapper).insert(any(IdentityLookupPO.class));
+
+            assertThatThrownBy(() -> repository.add(account))
+                    .isNotInstanceOf(IdentifierAlreadyTakenException.class)
+                    .isSameAs(timeout);
+
+            // 事务回滚，账号不应落库
+            assertThat(repository.findByUserId(userId)).isEmpty();
+        }
+    }
+
+    @Nested
+    @DisplayName("3. Update 更新（先 add 落库，再加载、修改、update）")
+    class Update{
+
+        @Test
+        @DisplayName("增量新增：已有账号追加身份和因子，新身份进入 lookup，整体可还原，变更集清空")
+        void update_addIdentityAndFactor() {
+            ShardedId userId = persisted(newLoginAccount(false)).getUserId();
+
+            LoginAccount loaded = load(userId);
+            ShardedId emailId = authIdFactory.newIdentityId(userId);
+            loaded.bindIdentity(emailId, EMAIL);
+            loaded.verifyIdentity(emailId, now());
+            MfaFactor factor = loaded.addIdentityFactor(authIdFactory.newFactorId(userId), emailId);
+            loaded.enableFactor(factor.getId(), now());
+            loaded.addSecretFactor(authIdFactory.newFactorId(userId), MfaFactorType.TOTP, "encrypted-secret");
+            repository.update(loaded);
+
+            assertThat(loaded.hasChanges()).isFalse();
+            assertThat(repository.findUserIdByIdentity(PHONE)).contains(userId);
+            assertThat(repository.findUserIdByIdentity(EMAIL)).contains(userId);
+            assertLoadedLoginAccount(loaded);
+        }
+
+        /**
+         * updateIdentity / updateFactor 是显式 set 的，漏写一列只有这里能发现。
+         * 所以每个可变列都要改成和初始值（null / PENDING）不同的值，且各列用不同时间，避免串列。
+         * 可变列：identity.verifiedAt / lastLoginAt；factor.status / verifiedAt / lastUsedAt。
+         */
+        @Test
+        @DisplayName("修改所有可变列：身份 verifiedAt/lastLoginAt，因子 status/verifiedAt/lastUsedAt 都被写回")
+        void update_allMutableColumns() {
+            ShardedId userId = authIdFactory.newUserId(PHONE);
+            ShardedId phoneId = authIdFactory.newIdentityId(userId);
+            ShardedId factorId = authIdFactory.newFactorId(userId);
+            LoginAccount account = LoginAccount.open(userId, phoneId, PHONE);
+            account.addSecretFactor(factorId, MfaFactorType.TOTP, "enc");
+            persisted(account);
+
+            Instant base = now();
+            LoginAccount loaded = load(userId);
+            loaded.verifyIdentity(phoneId, base.plusSeconds(1));
+            loaded.recordLogin(phoneId, base.plusSeconds(2));
+            loaded.enableFactor(factorId, base.plusSeconds(3));
+            loaded.recordFactorUsed(factorId, base.plusSeconds(4));
+            repository.update(loaded);
+
+            assertLoadedLoginAccount(loaded);
+        }
+
+        @Test
+        @DisplayName("删除身份和因子：对应行被删除，被删标识从 lookup 释放，保留的标识仍可查")
+        void update_removeIdentityAndFactor() {
+            ShardedId userId = authIdFactory.newUserId(PHONE);
+            LoginAccount account = LoginAccount.open(userId, authIdFactory.newIdentityId(userId), PHONE);
+            account.bindIdentity(authIdFactory.newIdentityId(userId), EMAIL);
+            ShardedId factorId = authIdFactory.newFactorId(userId);
+            account.addSecretFactor(factorId, MfaFactorType.TOTP, "enc");
+            persisted(account);
+
+            LoginAccount loaded = load(userId);
+            ShardedId phoneId = loaded.getIdentities().stream()
+                    .filter(i -> i.type().equals(PHONE.type())).findFirst().orElseThrow().getId();
+            loaded.unbindIdentity(phoneId);
+            loaded.removeFactor(factorId);
+            repository.update(loaded);
+
+            // 直接查表，不经过 findByUserId（它在没有身份行时不看因子，会掩盖因子行没删的问题）
+            assertThat(identityMapper.selectByUserId(userId.value())).hasSize(1);
+            assertThat(factorMapper.selectByUserId(userId.value())).isEmpty();
+            assertThat(repository.findUserIdByIdentity(PHONE)).isEmpty();
+            assertThat(repository.findUserIdByIdentity(EMAIL)).contains(userId);
+            assertLoadedLoginAccount(loaded);
+        }
+
+        @Test
+        @DisplayName("注销账号：身份行、因子行全部删除，lookup 中的标识也被释放")
+        void update_closeAccount() {
+            ShardedId userId = authIdFactory.newUserId(PHONE);
+            LoginAccount account = LoginAccount.open(userId, authIdFactory.newIdentityId(userId), PHONE);
+            account.bindIdentity(authIdFactory.newIdentityId(userId), EMAIL);
+            account.addSecretFactor(authIdFactory.newFactorId(userId), MfaFactorType.TOTP, "enc");
+            persisted(account);
+
+            LoginAccount loaded = load(userId);
+            loaded.close();
+            repository.update(loaded);
+
+            assertThat(identityMapper.selectByUserId(userId.value())).isEmpty();
+            assertThat(factorMapper.selectByUserId(userId.value())).isEmpty();
+            assertThat(repository.findUserIdByIdentity(PHONE)).isEmpty();
+            assertThat(repository.findUserIdByIdentity(EMAIL)).isEmpty();
+        }
+
+        @Test
+        @DisplayName("没有变更时 update 不碰数据库（identity / factor / lookup 都没有任何调用）")
+        void update_noChanges_doesNotTouchDb() {
+            ShardedId userId = persisted(newLoginAccount(true)).getUserId();
+            LoginAccount loaded = load(userId);
+            assertThat(loaded.hasChanges()).isFalse();
+            clearInvocations(identityMapper, factorMapper, identityLookupMapper);
+
+            repository.update(loaded);
+
+            verifyNoInteractions(identityMapper, factorMapper, identityLookupMapper);
+        }
+
+        @Test
+        @DisplayName("已有账号绑定被他人占用的标识：抛 IdentifierAlreadyTakenException，双方数据和 lookup 都不变")
+        void update_bindIdentifierTakenByOthers() {
+            // 账号 A 占有 PHONE
+            ShardedId userA = persisted(newLoginAccount(false)).getUserId();
+
+            // 账号 B 只有 EMAIL
+            ShardedId userB = authIdFactory.newUserId(EMAIL);
+            persisted(LoginAccount.open(userB, authIdFactory.newIdentityId(userB), EMAIL));
+
+            LoginAccount b = load(userB);
+            b.bindIdentity(authIdFactory.newIdentityId(userB), PHONE);
+
+            assertThatThrownBy(() -> repository.update(b))
+                    .isInstanceOf(IdentifierNotOwnedByUserException.class);
+
+            // 失败不能误释放 A 的占位，也不能污染 B
+            assertThat(repository.findUserIdByIdentity(PHONE)).contains(userA);
+            assertThat(repository.findUserIdByIdentity(EMAIL)).contains(userB);
+            assertThat(load(userB).getIdentities()).hasSize(1);
+        }
+
+        @Test
+        @DisplayName("标识被释放后可复用：A 解绑手机号后，B 能用同一手机号绑定")
+        void update_releasedIdentifierCanBeReused() {
+            ShardedId userA = authIdFactory.newUserId(PHONE);
+            ShardedId phoneIdA = authIdFactory.newIdentityId(userA);
+            LoginAccount a = LoginAccount.open(userA, phoneIdA, PHONE);
+            a.bindIdentity(authIdFactory.newIdentityId(userA), EMAIL);
+            persisted(a);
+            assertLoadedLoginAccount(a);
+
+            LoginAccount loadedA = load(userA);
+            loadedA.unbindIdentity(phoneIdA);
+            repository.update(loadedA);
+            assertLoadedLoginAccount(loadedA);
+
+            ShardedId userB = persisted(newLoginAccount(false)).getUserId();
+            assertThat(repository.findUserIdByIdentity(PHONE)).contains(userB);
+        }
+    }
+
+
+    // --------------------------------- private
+    private LoginAccount newLoginAccount(){
+        return newLoginAccount(true);
+    }
+    private LoginAccount newLoginAccount(boolean addFactor){
+        ShardedId userId = authIdFactory.newUserId(PHONE);
+        ShardedId identityId = authIdFactory.newIdentityId(userId);
+
+        LoginAccount account = LoginAccount.open(userId, identityId, PHONE);
+        if (addFactor){
+            account.verifyIdentity(identityId,  now());
+            ShardedId factorId = authIdFactory.newFactorId(userId);
+            account.addIdentityFactor(factorId, identityId);
+        }
+        return account;
+    }
+
+    /** 走生产路径（add）把账号落库，作为 Update 用例的初始状态 */
+    private LoginAccount persisted(LoginAccount account) {
+        repository.add(account);
+        return account;
+    }
+
+    private LoginAccount load(ShardedId userId) {
+        return repository.findByUserId(userId).orElseThrow();
+    }
+
+    private IdentityLookupPO newIdentityLookupPO(){
+        IdentityLookupPO po = new IdentityLookupPO();
+        po.setUserId(newId("user", 1).value());
+        po.setIdentityType(PHONE.type().getCode());
+        po.setIdentifier(PHONE.value());
+        return po;
+    }
+    private UserIdentityPO newUserIdentityPO(ShardedId userId){
+        UserIdentityPO ui = new UserIdentityPO();
+        ui.setUserId(userId.value());
+        ui.setId(authIdFactory.newIdentityId(userId).value());
+        ui.setIdentityType(PHONE.type().getCode());
+        ui.setIdentifier(PHONE.value());
+        return ui;
+    }
+
+    private UserMfaFactorPO newUserMfaFactorPO(ShardedId userId){
+        UserMfaFactorPO po = new UserMfaFactorPO();
+        po.setFactorType(MfaFactorType.SMS.getCode());
+        po.setUserId(userId.value());
+        po.setId(authIdFactory.newFactorId(userId).value());
+        po.setSecretEncrypted("test secretEncrypted");
+        return po;
+    }
+
+    /** 按 id 排序后逐项比较，不依赖 selectByUserId 的返回顺序 */
+    private static <T> List<T> sortedById(List<T> list, Function<T, ShardedId> idOf) {
+        return list.stream()
+                .sorted(Comparator.comparingLong((T t) -> idOf.apply(t).value()))
+                .toList();
+    }
+
+    private void assertLoadedLoginAccount(LoginAccount account){
+
+        Optional<LoginAccount> loaded = repository.findByUserId(account.getUserId());
 
         assertThat(loaded).isPresent();
         LoginAccount la = loaded.get();
-        assertThat(la.getUserId()).isEqualTo(userId);
-        assertThat(la.getIdentities()).hasSize(1);
-        UserIdentity identity = la.getIdentities().get(0);
-        assertThat(identity.getType()).isEqualTo(PHONE_IDENTITY_IDENTIFIER.type());
-        assertThat(identity.getIdentifier()).isEqualTo(PHONE_IDENTITY_IDENTIFIER.value());
-        assertThat(identity.getVerifiedAt()).isNull();
-        assertThat(identity.getLastLoginAt()).isNull();
+        assertThat(la.getUserId()).isEqualTo(account.getUserId());
+
+        List<UserIdentity> expectedIdentities = sortedById(account.getIdentities(), UserIdentity::getId);
+        List<UserIdentity> actualIdentities = sortedById(la.getIdentities(), UserIdentity::getId);
+        assertThat(actualIdentities).hasSize(expectedIdentities.size());
+        for (int i = 0; i < expectedIdentities.size(); i++) {
+            UserIdentity identity = expectedIdentities.get(i);
+            UserIdentity laIdentity = actualIdentities.get(i);
+            assertThat(laIdentity.getId()).isEqualTo(identity.getId());
+            assertThat(laIdentity.type()).isEqualTo(identity.type());
+            assertThat(laIdentity.getIdentifier()).isEqualTo(identity.getIdentifier());
+            assertThat(laIdentity.getVerifiedAt()).isEqualTo(identity.getVerifiedAt());
+            assertThat(laIdentity.getLastLoginAt()).isEqualTo(identity.getLastLoginAt());
+        }
+
+        List<MfaFactor> expectedFactors = sortedById(account.getFactors(), MfaFactor::getId);
+        List<MfaFactor> actualFactors = sortedById(la.getFactors(), MfaFactor::getId);
+        assertThat(actualFactors).hasSize(expectedFactors.size());
+        for (int i = 0; i < expectedFactors.size(); i++) {
+            MfaFactor factor = expectedFactors.get(i);
+            MfaFactor laFactor = actualFactors.get(i);
+
+            assertThat(laFactor.getId()).isEqualTo(factor.getId());
+            assertThat(laFactor.getUserId()).isEqualTo(factor.getUserId());
+            assertThat(laFactor.getType()).isEqualTo(factor.getType());
+            assertThat(laFactor.getIdentityId()).isEqualTo(factor.getIdentityId());
+            assertThat(laFactor.getSecretEncrypted()).isEqualTo(factor.getSecretEncrypted());
+            assertThat(laFactor.getStatus()).isEqualTo(factor.getStatus());
+            assertThat(laFactor.getVerifiedAt()).isEqualTo(factor.getVerifiedAt());
+            assertThat(laFactor.getLastUsedAt()).isEqualTo(factor.getLastUsedAt());
+        }
+
     }
 
-    @Test
-    @DisplayName("保存多身份和已启用的 MFA 因子后，能完整还原")
-    void findByUserId_multipleIdentitiesAndFactor_allReconstituted() {
-        ShardedId userId = newId("user", SHARD);
-        ShardedId phoneId = newId("user_identity", SHARD);
-        ShardedId emailId = newId("user_identity", SHARD);
-        ShardedId factorId = newId("user_mfa_factor", SHARD);
-
-        LoginAccount account = LoginAccount.open(userId, phoneId, PHONE_IDENTITY_IDENTIFIER);
-        account.verifyIdentity(phoneId, now());
-        account.bindIdentity(emailId, EMAIL_IDENTITY_IDENTIFIER);
-        account.verifyIdentity(emailId, now());
-        MfaFactor factor = account.addIdentityFactor(factorId, phoneId);
-        account.enableFactor(factor.getId(), now());
-        repository.update(account);
-
-        LoginAccount loaded = repository.findByUserId(userId).orElseThrow();
-        assertThat(loaded.getIdentities()).hasSize(2);
-        assertThat(loaded.getFactors()).hasSize(1);
-        assertThat(loaded.getFactors().get(0).getStatus()).isEqualTo(MfaFactorStatus.ENABLED);
-    }
-
-    // ------------------------------------------------------------------ findUserIdByIdentity
-
-    @Test
-    @DisplayName("保存账号后，identity_lookup 进入 ACTIVE，能按标识路由到 userId")
-    void findUserIdByIdentity_afterSave_routesToUserId() {
-        ShardedId userId = newId("user", SHARD);
-        ShardedId identityId = newId("user_identity", SHARD);
-        LoginAccount account = LoginAccount.open(userId, identityId, PHONE_IDENTITY_IDENTIFIER);
-        repository.update(account);
-
-        Optional<ShardedId> found = repository.findUserIdByIdentity(PHONE_IDENTITY_IDENTIFIER);
-
-        assertThat(found).contains(userId);
-    }
-
-    @Test
-    @DisplayName("解绑身份后，该标识从 lookup 中移除；保留的标识仍可查")
-    void findUserIdByIdentity_afterUnbind_removedIdentityNotRouteable() {
-        ShardedId userId = newId("user", SHARD);
-        ShardedId phoneId = newId("user_identity", SHARD);
-        ShardedId emailId = newId("user_identity", SHARD);
-
-        LoginAccount account = LoginAccount.open(userId, phoneId, PHONE_IDENTITY_IDENTIFIER);
-        account.bindIdentity(emailId, EMAIL_IDENTITY_IDENTIFIER);
-        repository.update(account);
-
-        LoginAccount loaded = repository.findByUserId(userId).orElseThrow();
-        loaded.unbindIdentity(phoneId);
-        repository.update(loaded);
-
-        assertThat(repository.findUserIdByIdentity(PHONE_IDENTITY_IDENTIFIER)).isEmpty();
-        assertThat(repository.findUserIdByIdentity(EMAIL_IDENTITY_IDENTIFIER)).contains(userId);
-    }
-
-    // ------------------------------------------------------------------ save - 新增身份
-
-    @Test
-    @DisplayName("clearChanges 后再次 save 为幂等 no-op，不产生重复行")
-    void save_afterClearChanges_isIdempotentNoOp() {
-        ShardedId userId = newId("user", SHARD);
-        ShardedId identityId = newId("user_identity", SHARD);
-        LoginAccount account = LoginAccount.open(userId, identityId, PHONE_IDENTITY_IDENTIFIER);
-        repository.update(account);
-        repository.update(account); // 变更集已清空，应为 no-op
-
-        assertThat(repository.findByUserId(userId).orElseThrow().getIdentities()).hasSize(1);
-    }
-
-    @Test
-    @DisplayName("注册已被占用的标识时，抛出 IdentifierAlreadyTakenException")
-    void save_duplicateIdentifier_throwsIdentifierAlreadyTakenException() {
-        ShardedId userId1 = newId("user", SHARD);
-        ShardedId identityId1 = newId("user_identity", SHARD);
-        LoginAccount account1 = LoginAccount.open(userId1, identityId1, PHONE_IDENTITY_IDENTIFIER);
-        repository.update(account1);
-
-        ShardedId userId2 = newId("user", SHARD);
-        ShardedId identityId2 = newId("user_identity", SHARD);
-        LoginAccount account2 = LoginAccount.open(userId2, identityId2, PHONE_IDENTITY_IDENTIFIER);
-
-        assertThatThrownBy(() -> repository.update(account2))
-                .isInstanceOf(IdentifierAlreadyTakenException.class);
-    }
-
-    // ------------------------------------------------------------------ save - 修改身份
-
-    @Test
-    @DisplayName("验证身份后，verifiedAt 被持久化")
-    void save_verifyIdentity_persistsVerifiedAt() {
-        ShardedId userId = newId("user", SHARD);
-        ShardedId identityId = newId("user_identity", SHARD);
-        LoginAccount account = LoginAccount.open(userId, identityId, PHONE_IDENTITY_IDENTIFIER);
-        repository.update(account);
-
-        Instant verifiedAt = now();
-        LoginAccount loaded = repository.findByUserId(userId).orElseThrow();
-        loaded.verifyIdentity(identityId, verifiedAt);
-        repository.update(loaded);
-
-        UserIdentity identity = repository.findByUserId(userId).orElseThrow()
-                .getIdentities().get(0);
-        assertThat(identity.getVerifiedAt()).isEqualTo(verifiedAt);
-    }
-
-    @Test
-    @DisplayName("记录登录时间后，lastLoginAt 被持久化")
-    void save_recordLogin_persistsLastLoginAt() {
-        ShardedId userId = newId("user", SHARD);
-        ShardedId identityId = newId("user_identity", SHARD);
-        LoginAccount account = LoginAccount.open(userId, identityId, PHONE_IDENTITY_IDENTIFIER);
-        repository.update(account);
-
-        Instant loginAt = now();
-        LoginAccount loaded = repository.findByUserId(userId).orElseThrow();
-        loaded.recordLogin(identityId, loginAt);
-        repository.update(loaded);
-
-        UserIdentity identity = repository.findByUserId(userId).orElseThrow()
-                .getIdentities().get(0);
-        assertThat(identity.getLastLoginAt()).isEqualTo(loginAt);
-    }
-
-    // ------------------------------------------------------------------ save - 解绑身份
-
-    @Test
-    @DisplayName("解绑身份后，对应身份行被删除，其余身份保留")
-    void save_unbindIdentity_removesIdentityRow() {
-        ShardedId userId = newId("user", SHARD);
-        ShardedId phoneId = newId("user_identity", SHARD);
-        ShardedId emailId = newId("user_identity", SHARD);
-        LoginAccount account = LoginAccount.open(userId, phoneId, PHONE_IDENTITY_IDENTIFIER);
-        account.bindIdentity(emailId, EMAIL_IDENTITY_IDENTIFIER);
-        repository.update(account);
-
-        LoginAccount loaded = repository.findByUserId(userId).orElseThrow();
-        loaded.unbindIdentity(phoneId);
-        repository.update(loaded);
-
-        LoginAccount reloaded = repository.findByUserId(userId).orElseThrow();
-        assertThat(reloaded.getIdentities()).hasSize(1);
-        assertThat(reloaded.getIdentities().get(0).getType())
-                .isEqualTo(EMAIL_IDENTITY_IDENTIFIER.type());
-    }
-
-    @Test
-    @DisplayName("解绑有关联 MFA 因子的身份时，关联因子被置为 DISABLED")
-    void save_unbindIdentityWithFactor_disablesReferencingFactor() {
-        ShardedId userId = newId("user", SHARD);
-        ShardedId phoneId = newId("user_identity", SHARD);
-        ShardedId emailId = newId("user_identity", SHARD);
-        ShardedId factorId = newId("user_mfa_factor", SHARD);
-
-        LoginAccount account = LoginAccount.open(userId, phoneId, PHONE_IDENTITY_IDENTIFIER);
-        account.verifyIdentity(phoneId, now());
-        account.bindIdentity(emailId, EMAIL_IDENTITY_IDENTIFIER);
-        MfaFactor factor = account.addIdentityFactor(factorId, phoneId);
-        account.enableFactor(factor.getId(), now());
-        repository.update(account);
-
-        LoginAccount loaded = repository.findByUserId(userId).orElseThrow();
-        loaded.unbindIdentity(phoneId);
-        repository.update(loaded);
-
-        LoginAccount reloaded = repository.findByUserId(userId).orElseThrow();
-        assertThat(reloaded.getFactors()).hasSize(1);
-        assertThat(reloaded.getFactors().get(0).getStatus()).isEqualTo(MfaFactorStatus.DISABLED);
-    }
-
-    // ------------------------------------------------------------------ save - MFA 因子增删改
-
-    @Test
-    @DisplayName("新增 TOTP 因子后，密文、类型和 PENDING 状态能被还原")
-    void save_addTotpFactor_reconstructedCorrectly() {
-        ShardedId userId = newId("user", SHARD);
-        ShardedId identityId = newId("user_identity", SHARD);
-        ShardedId factorId = newId("user_mfa_factor", SHARD);
-        LoginAccount account = LoginAccount.open(userId, identityId, PHONE_IDENTITY_IDENTIFIER);
-        account.addSecretFactor(factorId, MfaFactorType.TOTP, "encrypted-secret");
-        repository.update(account);
-
-        LoginAccount loaded = repository.findByUserId(userId).orElseThrow();
-        assertThat(loaded.getFactors()).hasSize(1);
-        MfaFactor factor = loaded.getFactors().get(0);
-        assertThat(factor.getType()).isEqualTo(MfaFactorType.TOTP);
-        assertThat(factor.getSecretEncrypted()).isEqualTo("encrypted-secret");
-        assertThat(factor.getStatus()).isEqualTo(MfaFactorStatus.PENDING);
-    }
-
-    @Test
-    @DisplayName("启用 MFA 因子后，状态变为 ENABLED，verifiedAt 被持久化")
-    void save_enableFactor_persistsStatusAndVerifiedAt() {
-        ShardedId userId = newId("user", SHARD);
-        ShardedId phoneId = newId("user_identity", SHARD);
-        ShardedId factorId = newId("user_mfa_factor", SHARD);
-
-        LoginAccount account = LoginAccount.open(userId, phoneId, PHONE_IDENTITY_IDENTIFIER);
-        account.verifyIdentity(phoneId, now());
-        MfaFactor factor = account.addIdentityFactor(factorId, phoneId);
-        repository.update(account);
-
-        Instant enabledAt = now();
-        LoginAccount loaded = repository.findByUserId(userId).orElseThrow();
-        loaded.enableFactor(factor.getId(), enabledAt);
-        repository.update(loaded);
-
-        MfaFactor reloaded = repository.findByUserId(userId).orElseThrow()
-                .getFactors().get(0);
-        assertThat(reloaded.getStatus()).isEqualTo(MfaFactorStatus.ENABLED);
-        assertThat(reloaded.getVerifiedAt()).isEqualTo(enabledAt);
-    }
-
-    @Test
-    @DisplayName("停用 MFA 因子后，状态变为 DISABLED 并被持久化")
-    void save_disableFactor_persistsDisabledStatus() {
-        ShardedId userId = newId("user", SHARD);
-        ShardedId phoneId = newId("user_identity", SHARD);
-        ShardedId factorId = newId("user_mfa_factor", SHARD);
-
-        LoginAccount account = LoginAccount.open(userId, phoneId, PHONE_IDENTITY_IDENTIFIER);
-        account.verifyIdentity(phoneId, now());
-        MfaFactor factor = account.addIdentityFactor(factorId, phoneId);
-        account.enableFactor(factor.getId(), now());
-        repository.update(account);
-
-        LoginAccount loaded = repository.findByUserId(userId).orElseThrow();
-        loaded.disableFactor(factor.getId());
-        repository.update(loaded);
-
-        assertThat(repository.findByUserId(userId).orElseThrow()
-                .getFactors().get(0).getStatus())
-                .isEqualTo(MfaFactorStatus.DISABLED);
-    }
-
-    @Test
-    @DisplayName("记录因子使用时间后，lastUsedAt 被持久化")
-    void save_recordFactorUsed_persistsLastUsedAt() {
-        ShardedId userId = newId("user", SHARD);
-        ShardedId phoneId = newId("user_identity", SHARD);
-        ShardedId factorId = newId("user_mfa_factor", SHARD);
-
-        LoginAccount account = LoginAccount.open(userId, phoneId, PHONE_IDENTITY_IDENTIFIER);
-        account.verifyIdentity(phoneId, now());
-        MfaFactor factor = account.addIdentityFactor(factorId, phoneId);
-        account.enableFactor(factor.getId(), now());
-        repository.update(account);
-
-        Instant usedAt = now();
-        LoginAccount loaded = repository.findByUserId(userId).orElseThrow();
-        loaded.recordFactorUsed(factor.getId(), usedAt);
-        repository.update(loaded);
-
-        assertThat(repository.findByUserId(userId).orElseThrow()
-                .getFactors().get(0).getLastUsedAt())
-                .isEqualTo(usedAt);
-    }
-
-    @Test
-    @DisplayName("删除 MFA 因子后，因子行从数据库中移除")
-    void save_removeFactor_deletesFactorRow() {
-        ShardedId userId = newId("user", SHARD);
-        ShardedId identityId = newId("user_identity", SHARD);
-        ShardedId factorId = newId("user_mfa_factor", SHARD);
-        LoginAccount account = LoginAccount.open(userId, identityId, PHONE_IDENTITY_IDENTIFIER);
-        account.addSecretFactor(factorId, MfaFactorType.TOTP, "enc");
-        repository.update(account);
-
-        LoginAccount loaded = repository.findByUserId(userId).orElseThrow();
-        loaded.removeFactor(factorId);
-        repository.update(loaded);
-
-        assertThat(repository.findByUserId(userId).orElseThrow().getFactors()).isEmpty();
-    }
-
-    // ------------------------------------------------------------------ save - 注销
-
-    @Test
-    @DisplayName("注销账号后，所有身份和因子行被删除，lookup 中的标识也被释放")
-    void save_closeAccount_removesAllRowsAndReleasesLookup() {
-        ShardedId userId = newId("user", SHARD);
-        ShardedId phoneId = newId("user_identity", SHARD);
-        ShardedId emailId = newId("user_identity", SHARD);
-        ShardedId factorId = newId("user_mfa_factor", SHARD);
-
-        LoginAccount account = LoginAccount.open(userId, phoneId, PHONE_IDENTITY_IDENTIFIER);
-        account.verifyIdentity(phoneId, now());
-        account.bindIdentity(emailId, EMAIL_IDENTITY_IDENTIFIER);
-        account.addSecretFactor(factorId, MfaFactorType.TOTP, "enc");
-        repository.update(account);
-
-        LoginAccount loaded = repository.findByUserId(userId).orElseThrow();
-        loaded.close();
-        repository.update(loaded);
-
-        assertThat(repository.findByUserId(userId)).isEmpty();
-        assertThat(repository.findUserIdByIdentity(PHONE_IDENTITY_IDENTIFIER)).isEmpty();
-        assertThat(repository.findUserIdByIdentity(EMAIL_IDENTITY_IDENTIFIER)).isEmpty();
-    }
-
-    // ------------------------------------------------------------------ save - 变更集
-
-    @Test
-    @DisplayName("save 成功后变更集被清空，hasChanges() 返回 false")
-    void save_afterSuccess_changesCleared() {
-        ShardedId userId = newId("user", SHARD);
-        ShardedId identityId = newId("user_identity", SHARD);
-        LoginAccount account = LoginAccount.open(userId, identityId, PHONE_IDENTITY_IDENTIFIER);
-        repository.update(account);
-
-        assertThat(account.hasChanges()).isFalse();
-    }
 }
