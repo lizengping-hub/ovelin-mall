@@ -51,11 +51,10 @@ public class LoginAccount {
     public static LoginAccount open(ShardedId userId, ShardedId identityId,
                                     IdentityIdentifier identityIdentifier) {
         LoginAccount account = new LoginAccount(userId);
-        UserIdentity identity = UserIdentity.register(identityId, userId, identityIdentifier);
-        account.identities.add(identity);
-        account.identityChanges.added(identity.getId(), identity);
+        account.bindIdentity(identityId, identityIdentifier);
         return account;
     }
+
 
     /** 仅供持久化层还原：不校验、不产生变更记录 */
     public static LoginAccount reconstitute(ShardedId userId, List<UserIdentity> identities,
@@ -74,8 +73,7 @@ public class LoginAccount {
         if (findIdentity(identityIdentifier).isPresent()) {
             throw new IdentifierAlreadyBindedException(identityIdentifier);
         }
-        identities.add(identity);
-        identityChanges.added(identity.getId(), identity);
+        addIdentityInternal(identity);
         return identity;
     }
 
@@ -108,8 +106,7 @@ public class LoginAccount {
                 factorChanges.dirty(factor.getId(), factor);
             }
         }
-        identities.remove(target);
-        identityChanges.removed(target.getId(), target);
+        removeIdentityInternal(target);
     }
 
     // ------------------------------------------------------------------ 二次验证因子
@@ -123,16 +120,16 @@ public class LoginAccount {
             throw new InvalidStatusException("该身份已存在未停用的二次验证因子");
         }
         MfaFactor factor = MfaFactor.forIdentity(factorId, identity);
-        factors.add(factor);
-        factorChanges.added(factor.getId(), factor);
+
+        addFactorInternal(factor);
         return factor;
     }
+
 
     /** TOTP / WebAuthn / 恢复码：secretEncrypted 由应用服务加密后传入 */
     public MfaFactor addSecretFactor(ShardedId factorId, MfaFactorType type, String secretEncrypted) {
         MfaFactor factor = MfaFactor.withSecret(factorId, userId, type, secretEncrypted);
-        factors.add(factor);
-        factorChanges.added(factor.getId(), factor);
+        addFactorInternal(factor);
         return factor;
     }
 
@@ -178,8 +175,7 @@ public class LoginAccount {
             removeFactorInternal(factor);
         }
         for (UserIdentity identity : List.copyOf(identities)) {
-            identities.remove(identity);
-            identityChanges.removed(identity.getId(), identity);
+            removeIdentityInternal(identity);
         }
     }
 
@@ -258,9 +254,24 @@ public class LoginAccount {
                 .orElseThrow(() -> new InvalidArgumentException("二次验证因子不存在"));
     }
 
+    private void addIdentityInternal(UserIdentity identity) {
+        identities.add(identity);
+        identityChanges.added(identity.getId(), identity);
+    }
+
+    private void addFactorInternal(MfaFactor factor) {
+        factors.add(factor);
+        factorChanges.added(factor.getId(), factor);
+    }
+
     private void removeFactorInternal(MfaFactor factor) {
         factors.remove(factor);
         factorChanges.removed(factor.getId(), factor);
+    }
+
+    private void removeIdentityInternal(UserIdentity identity) {
+        identities.remove(identity);
+        identityChanges.removed(identity.getId(), identity);
     }
 
     /** 子实体变更集：新增的对象即使后续被修改也只算 added；新增后又删除则相互抵消 */
