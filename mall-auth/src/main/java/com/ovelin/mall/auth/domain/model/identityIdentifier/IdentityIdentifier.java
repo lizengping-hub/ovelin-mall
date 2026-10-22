@@ -2,8 +2,9 @@ package com.ovelin.mall.auth.domain.model.identityIdentifier;
 
 import com.ovelin.mall.auth.domain.model.enums.IdentityType;
 
+import java.util.Objects;
+
 public abstract class IdentityIdentifier {
-    private Integer hashCode;
 
     public abstract IdentityType type();
 
@@ -11,10 +12,7 @@ public abstract class IdentityIdentifier {
 
     @Override
     public int hashCode(){
-        if (hashCode == null){
-            hashCode = (type().getCode()+value()).hashCode();
-        }
-        return hashCode;
+        return Objects.hash(type(), value());
     }
     @Override
     public boolean equals(Object o){
