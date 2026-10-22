@@ -146,7 +146,7 @@ class LoginAccountTest {
             LoginAccount account = persisted();
 
             assertThatThrownBy(() -> account.verifyIdentity(EMAIL_ID, NOW))
-                    .isInstanceOf(InvalidArgumentException.class);
+                    .isInstanceOf(IdentityNotExistException.class);
         }
     }
 
@@ -196,7 +196,7 @@ class LoginAccountTest {
             LoginAccount account = persistedWithVerifiedPhone();
 
             assertThatThrownBy(() -> account.unbindIdentity(EMAIL_ID))
-                    .isInstanceOf(InvalidArgumentException.class);
+                    .isInstanceOf(IdentityNotExistException.class);
         }
     }
 
@@ -209,7 +209,7 @@ class LoginAccountTest {
             account.bindIdentity(PHONE_ID, PHONE_IDENTITY_IDENTIFIER);
 
             assertThatThrownBy(() -> account.addIdentityFactor(FACTOR_1, PHONE_ID))
-                    .isInstanceOf(IllegalStateException.class);
+                    .isInstanceOf(InvalidArgumentException.class);
 
             account.verifyIdentity(PHONE_ID, NOW);
             UserMfaFactor factor = account.addIdentityFactor(FACTOR_1, PHONE_ID);
@@ -226,7 +226,7 @@ class LoginAccountTest {
             account.verifyIdentity(USERNAME_ID, NOW);
 
             assertThatThrownBy(() -> account.addIdentityFactor(FACTOR_1, USERNAME_ID))
-                    .isInstanceOf(IllegalStateException.class);
+                    .isInstanceOf(InvalidArgumentException.class);
         }
 
         @Test
@@ -248,7 +248,7 @@ class LoginAccountTest {
             account.unbindIdentity(PHONE_ID);
 
             assertThatThrownBy(() -> account.enableFactor(FACTOR_1, NOW))
-                    .isInstanceOf(InvalidArgumentException.class);
+                    .isInstanceOf(MfaFactorNotExistException.class);
         }
     }
 
@@ -271,7 +271,7 @@ class LoginAccountTest {
             LoginAccount account = persisted();
 
             assertThatThrownBy(() -> account.addSecretFactor(FACTOR_1, MfaFactorType.SMS, "x"))
-                    .isInstanceOf(InvalidArgumentException.class);
+                    .isInstanceOf(IllegalArgumentException.class);
         }
 
         @Test
@@ -279,7 +279,7 @@ class LoginAccountTest {
             LoginAccount account = persisted();
 
             assertThatThrownBy(() -> account.addSecretFactor(OTHER_SHARD, MfaFactorType.TOTP, "x"))
-                    .isInstanceOf(InvalidArgumentException.class);
+                    .isInstanceOf(IllegalArgumentException.class);
         }
     }
 
@@ -355,7 +355,7 @@ class LoginAccountTest {
             LoginAccount account = persisted();
 
             assertThatThrownBy(() -> account.enableFactor(FACTOR_1, NOW))
-                    .isInstanceOf(InvalidArgumentException.class);
+                    .isInstanceOf(MfaFactorNotExistException.class);
         }
     }
 
