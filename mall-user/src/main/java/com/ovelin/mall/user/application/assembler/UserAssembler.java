@@ -1,6 +1,5 @@
 package com.ovelin.mall.user.application.assembler;
 
-import com.ovelin.mall.common.sharding.core.ov.ShardedId;
 import com.ovelin.mall.user.api.CreateUserCommand;
 import com.ovelin.mall.user.api.UserDTO;
 import com.ovelin.mall.user.domain.model.aggregate.User;

@@ -35,11 +35,6 @@
         <dependencies>
             <dependency>
                 <groupId>com.ovelin</groupId>
-                <artifactId>mall-ddd-kernel</artifactId>
-                <version>${project.version}</version>
-            </dependency>
-            <dependency>
-                <groupId>com.ovelin</groupId>
                 <artifactId>mall-common-sharding-core</artifactId>
                 <version>${project.version}</version>
             </dependency>
@@ -180,7 +175,6 @@
         <module>mall-cart</module>
         <module>mall-cart-api</module>
         <module>mall-common</module>
-        <module>mall-ddd-kernel</module>
         <module>mall-fulfillment</module>
         <module>mall-fulfillment-api</module>
         <module>mall-inventory</module>

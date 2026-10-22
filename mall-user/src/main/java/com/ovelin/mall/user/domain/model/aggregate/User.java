@@ -1,7 +1,6 @@
 package com.ovelin.mall.user.domain.model.aggregate;
 
 
-import com.ovelin.mall.common.sharding.core.ddd.ShardedAggregateRoot;
 import com.ovelin.mall.common.sharding.core.ov.ShardedId;
 import com.ovelin.mall.user.domain.exception.InvalidUserStatusException;
 import com.ovelin.mall.user.domain.model.enums.Gender;
@@ -20,7 +19,7 @@ import java.util.Objects;
  * deregisteredAt 是业务时间：仅注销时由应用服务传入，未注销为 null。
  */
 @Getter
-public class User implements ShardedAggregateRoot<ShardedId> {
+public class User {
 
     private final ShardedId id;
     private final RegisterSource registerSource;

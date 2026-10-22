@@ -1,8 +1,8 @@
 package com.ovelin.mall.common.sharding.core.ov;
 
-import com.ovelin.mall.ddd.kernel.Identifier;;
+import java.io.Serializable;
 
-public final class ShardedId implements Identifier {
+public final class ShardedId implements Serializable {
     private final long id;
     private ShardedId(long id) { this.id = id; }
 

@@ -64,7 +64,7 @@ class ShardedIdTest {
     @Test
     void toStringShouldBeHex() {
         assertEquals("0x" + Long.toHexString(ShardedId.fromId(255L).value()),
-                ShardedId.fromId(255L).toString());
+                ShardedId.fromId(255L).toHexString());
     }
     @Test
     void shardIdShouldEquals(){
