@@ -11,12 +11,7 @@ import com.ovelin.mall.common.sharding.core.ov.ShardedId;
 import lombok.Getter;
 
 import java.time.Instant;
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.LinkedHashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.Optional;
+import java.util.*;
 
 /**
  * 登录账号聚合根：持有同一用户的登录身份（identities）与二次验证因子（mfaFactors）。
@@ -103,9 +98,11 @@ public class LoginAccount {
         if (identities.size() <= 1) {
             throw new InvalidArgumentException("至少保留一个登录身份");
         }
-        for (UserMfaFactor factor : factors) {
-            if (factor.references(identityId) && factor.disable()) {
-                factorChanges.dirty(factor.getId(), factor);
+        for (Iterator<UserMfaFactor> it = factors.iterator(); it.hasNext(); ) {
+            UserMfaFactor factor = it.next();
+            if (factor.references(identityId)) {
+                it.remove();
+                factorChanges.removed(factor.getId(), factor);
             }
         }
         removeIdentityInternal(target);

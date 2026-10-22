@@ -1,6 +1,8 @@
 package com.ovelin.mall.auth.domain.model.agregate;
 
 import com.ovelin.mall.auth.domain.exception.IdentifierAlreadyBoundException;
+import com.ovelin.mall.auth.domain.exception.IdentityNotExistException;
+import com.ovelin.mall.auth.domain.exception.MfaFactorNotExistException;
 import com.ovelin.mall.auth.domain.model.aggregate.LoginAccount;
 import com.ovelin.mall.auth.domain.model.aggregate.UserMfaFactor;
 import com.ovelin.mall.auth.domain.model.aggregate.UserIdentity;
@@ -174,8 +176,7 @@ class LoginAccountTest {
             account.unbindIdentity(PHONE_ID);
 
             assertThat(account.removedIdentities()).extracting(UserIdentity::getId).containsExactly(PHONE_ID);
-            assertThat(account.dirtyFactors()).extracting(UserMfaFactor::getId).containsExactly(FACTOR_1);
-            assertThat(account.dirtyFactors().get(0).getStatus()).isEqualTo(MfaFactorStatus.DISABLED);
+            assertThat(account.removedFactors()).extracting(UserMfaFactor::getId).containsExactly(FACTOR_1);
             // 不引用该身份的因子保持启用
             assertThat(account.enabledFactors()).extracting(UserMfaFactor::getId).containsExactly(FACTOR_2);
         }
