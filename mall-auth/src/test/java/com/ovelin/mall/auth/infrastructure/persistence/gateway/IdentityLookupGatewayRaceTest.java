@@ -6,6 +6,7 @@ import com.ovelin.mall.auth.domain.model.identityIdentifier.EmailIdentifier;
 import com.ovelin.mall.auth.domain.model.identityIdentifier.IdentityIdentifier;
 import com.ovelin.mall.auth.infrastructure.persistence.mapper.IdentityLookupMapper;
 import com.ovelin.mall.auth.infrastructure.persistence.po.IdentityLookupPO;
+import com.ovelin.mall.common.exception.global.ConcurrentUpdateException;
 import com.ovelin.mall.common.sharding.core.ov.ShardedId;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -13,7 +14,6 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
-import java.util.ConcurrentModificationException;
 
 import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -80,7 +80,7 @@ class IdentityLookupGatewayRaceTest {
         givenRowExists(owner, IdentityLookupStatus.RESERVED);   // deleteIfMatch 默认返回 0
 
         assertThatThrownBy(() -> gateway().cancelReserve(IDENTIFIER, owner))
-                .isInstanceOf(ConcurrentModificationException.class);
+                .isInstanceOf(ConcurrentUpdateException.class);
 
         verify(mapper, times(2)).deleteIfMatch(any(), any(), anyLong(), any());   // 首次 + 重试一次
     }
@@ -92,7 +92,7 @@ class IdentityLookupGatewayRaceTest {
         givenRowExists(owner, IdentityLookupStatus.RELEASING);
 
         assertThatThrownBy(() -> gateway().completeRelease(IDENTIFIER, owner))
-                .isInstanceOf(ConcurrentModificationException.class);
+                .isInstanceOf(ConcurrentUpdateException.class);
 
         verify(mapper, times(2)).deleteIfMatch(any(), any(), anyLong(), any());
     }

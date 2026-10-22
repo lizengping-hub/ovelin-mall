@@ -42,7 +42,7 @@ class UserIdentityPOConverterTest {
         assertThat(identity.getId()).isEqualTo(ID);
         assertThat(identity.getUserId()).isEqualTo(USER_ID);
         assertThat(identity.type()).isEqualTo(IdentityType.EMAIL);
-        assertThat(identity.getIdentifier()).isEqualTo(IDENTIFIER);
+        assertThat(identity.value()).isEqualTo(IDENTIFIER);
         assertThat(identity.getVerifiedAt()).isEqualTo(VERIFIED_AT);
         assertThat(identity.getLastLoginAt()).isEqualTo(LAST_LOGIN_AT);
     }
