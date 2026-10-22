@@ -59,12 +59,18 @@ class LoginAccountTest {
         @Test
         void createsAccountWithFirstIdentityAsAddedChange() {
             LoginAccount account = LoginAccount.open(USER, USERNAME_ID, USERNAME_IDENTITY_IDENTIFIER);
-
+            assertThat(account.isNew()).isTrue();
+            assertThat(account.getVersion()).isZero();
             assertThat(account.getUserId()).isEqualTo(USER);
             assertThat(account.getIdentities()).hasSize(1);
             assertThat(account.addedIdentities()).extracting(UserIdentity::getId).containsExactly(USERNAME_ID);
             assertThat(account.getFactors()).isEmpty();
             assertThat(account.hasChanges()).isTrue();
+
+            account.unNew();
+            assertThat(account.isNew()).isFalse();
+            account.increaseVersion();
+            assertThat(account.getVersion()).isEqualTo(1);
         }
 
         @Test

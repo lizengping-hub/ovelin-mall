@@ -2,6 +2,7 @@ package com.ovelin.mall.auth.infrastructure.persistence.repository;
 
 import com.baomidou.mybatisplus.core.conditions.Wrapper;
 import com.ovelin.mall.auth.application.port.AuthIdFactory;
+import com.ovelin.mall.auth.domain.exception.AccountStatusChangedException;
 import com.ovelin.mall.auth.domain.exception.IdentifierAlreadyTakenException;
 import com.ovelin.mall.auth.domain.exception.IdentifierNotOwnedByUserException;
 import com.ovelin.mall.auth.domain.model.aggregate.LoginAccount;
@@ -23,8 +24,10 @@ import com.ovelin.mall.auth.infrastructure.persistence.po.LoginAccountPO;
 import com.ovelin.mall.auth.infrastructure.persistence.po.UserIdentityPO;
 import com.ovelin.mall.auth.infrastructure.persistence.po.UserMfaFactorPO;
 import com.ovelin.mall.common.sharding.core.ov.ShardedId;
+import lombok.extern.slf4j.Slf4j;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
+import org.junit.jupiter.api.RepeatedTest;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.dao.QueryTimeoutException;
@@ -63,6 +66,7 @@ import static org.mockito.Mockito.*;
  * <p>Update 用例的约定：初始状态通过 add 落库，再 findByUserId → 修改 → update，
  * 这样每个用例测的才是"差异写入"。
  */
+@Slf4j
 class LoginAccountRepositoryImplIT extends AuthIntegrationTestSupport {
 
     private static final IdentityIdentifier PHONE =
@@ -189,7 +193,11 @@ class LoginAccountRepositoryImplIT extends AuthIntegrationTestSupport {
         @DisplayName("新增账号和查询")
         void addAndQuery(){
             LoginAccount account = newPhoneIdentityLoginAccount(false);
+
             repository.save(account);
+
+            assertThat(account.getVersion()).isZero();
+            assertThat(account.isNew()).isFalse();
             assertThat(account.hasChanges()).isFalse();
             assertThat(repository.findUserIdByIdentity(PHONE)).contains(account.getUserId());
             loadAndAssertLoginAccount(account);
@@ -308,7 +316,10 @@ class LoginAccountRepositoryImplIT extends AuthIntegrationTestSupport {
             loaded.addSecretFactor(authIdFactory.newFactorId(userId), MfaFactorType.TOTP, "encrypted-secret");
             repository.save(loaded);
 
+            assertThat(loaded.getVersion()).isEqualTo(1);
+            assertThat(loaded.isNew()).isFalse();
             assertThat(loaded.hasChanges()).isFalse();
+
             assertThat(repository.findUserIdByIdentity(PHONE)).contains(userId);
             assertThat(repository.findUserIdByIdentity(EMAIL)).contains(userId);
             loadAndAssertLoginAccount(loaded);
@@ -551,7 +562,7 @@ class LoginAccountRepositoryImplIT extends AuthIntegrationTestSupport {
             assertThat(repository.findUserIdByIdentity(EMAIL)).contains(userId);
         }
     }
-    @Test
+    @RepeatedTest(5)
     @DisplayName("并发：两个账号同时绑定同一个手机号，只有一个成功，输家回滚且不影响赢家")
     void concurrentBindSameIdentifier_onlyOneWins() throws Exception {
         ShardedId userA = authIdFactory.newUserId(EmailIdentifier.from("a@example.com"));
@@ -564,26 +575,67 @@ class LoginAccountRepositoryImplIT extends AuthIntegrationTestSupport {
         LoginAccount b = load(userB);
         b.bindIdentity(authIdFactory.newIdentityId(userB), PHONE);
 
-        CyclicBarrier barrier = new CyclicBarrier(2);
-        ExecutorService pool = Executors.newFixedThreadPool(2);
-        List<Future<?>> futures = List.of(
-                pool.submit(() -> { barrier.await(); repository.save(a); return null; }),
-                pool.submit(() -> { barrier.await(); repository.save(b); return null; }));
-
-        int success = 0;
-        for (Future<?> f : futures) {
-            try { f.get(10, TimeUnit.SECONDS); success++; }
-            catch (ExecutionException e) {
-                assertThat(e.getCause()).isInstanceOf(IdentifierNotOwnedByUserException.class); // 含子类
-            }
-        }
-        pool.shutdown();
+        int success = saveWithThreadPool(a, b, IdentifierNotOwnedByUserException.class);
 
         assertThat(success).isEqualTo(1);
         ShardedId winner = repository.findUserIdByIdentity(PHONE).orElseThrow();
         ShardedId loser = winner.equals(userA) ? userB : userA;
         assertThat(load(winner).getIdentities()).hasSize(2);
         assertThat(load(loser).getIdentities()).hasSize(1);   // 输家回滚
+    }
+
+    @RepeatedTest(5)
+    @DisplayName("并发：一个账号并发移除不同的身份")
+    void concurrentUnbindDifferentIdentifier_onlyOneWins() throws Exception {
+        LoginAccount newed = newPhoneIdentityLoginAccount(false);
+        ShardedId userId = newed.getUserId();
+        newed.bindIdentity(authIdFactory.newIdentityId(userId), EMAIL);
+        persisted(newed);
+        long version = newed.getVersion();
+        LoginAccount a0 = load(userId);
+        a0.unbindIdentity(a0.getIdentities().getFirst().getId());
+
+        LoginAccount a1 = load(userId);
+        a1.unbindIdentity(a1.getIdentities().get(1).getId());
+
+
+        int success = saveWithThreadPool(a0, a1, AccountStatusChangedException.class);
+
+        assertThat(success).isEqualTo(1);
+
+        LoginAccount updated = load(userId);
+        assertThat(updated.getVersion()).isEqualTo(version+1);
+        assertThat(updated.getIdentities()).hasSize(1);
+    }
+
+    private int saveWithThreadPool(LoginAccount a0, LoginAccount a1, Class<?> expectedException) throws InterruptedException, TimeoutException {
+        CyclicBarrier barrier = new CyclicBarrier(2);
+        int success;
+        try (ExecutorService pool = Executors.newFixedThreadPool(2)) {
+            List<Future<?>> futures = List.of(
+                    pool.submit(() -> {
+                        barrier.await();
+                        repository.save(a0);
+                        return null;
+                    }),
+                    pool.submit(() -> {
+                        barrier.await();
+                        repository.save(a1);
+                        return null;
+                    }));
+
+            success = 0;
+            for (Future<?> f : futures) {
+                try {
+                    f.get(10, TimeUnit.SECONDS);
+                    success++;
+                } catch (ExecutionException e) {
+                    assertThat(e.getCause()).isInstanceOf(expectedException); // 含子类
+                }
+            }
+            pool.shutdown();
+        }
+        return success;
     }
 
     // --------------------------------- private
@@ -660,6 +712,8 @@ class LoginAccountRepositoryImplIT extends AuthIntegrationTestSupport {
         assertThat(loaded).isPresent();
         LoginAccount la = loaded.get();
         assertThat(la.getUserId()).isEqualTo(account.getUserId());
+        assertThat(la.isNew()).isEqualTo(account.isNew());
+        assertThat(la.getVersion()).isEqualTo(account.getVersion());
 
         List<UserIdentity> expectedIdentities = sortedById(account.getIdentities(), UserIdentity::getId);
         List<UserIdentity> actualIdentities = sortedById(la.getIdentities(), UserIdentity::getId);
