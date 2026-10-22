@@ -10,7 +10,7 @@ import lombok.Getter;
 public class IdentifierNotExistException extends AuthDomainException {
 
     public IdentifierNotExistException(IdentityIdentifier identifier) {
-        super(AuthErrorCode.IDENTIFIER_ALREADY_TAKEN, "登录标识不存在: " + identifier);
+        super(AuthErrorCode.IDENTIFIER_NOT_EXIST, "登录标识不存在: " + identifier);
     }
 
 }

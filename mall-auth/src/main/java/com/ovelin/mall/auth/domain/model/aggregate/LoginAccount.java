@@ -1,6 +1,8 @@
 package com.ovelin.mall.auth.domain.model.aggregate;
 
-import com.ovelin.mall.auth.domain.exception.IdentifierAlreadyBindedException;
+import com.ovelin.mall.auth.domain.exception.IdentifierAlreadyBoundException;
+import com.ovelin.mall.auth.domain.exception.IdentityNotExistException;
+import com.ovelin.mall.auth.domain.exception.MfaFactorNotExistException;
 import com.ovelin.mall.auth.domain.model.enums.MfaFactorType;
 import com.ovelin.mall.auth.domain.model.identityIdentifier.IdentityIdentifier;
 import com.ovelin.mall.common.exception.global.InvalidArgumentException;
@@ -36,10 +38,10 @@ public class LoginAccount {
     @Getter
     private final ShardedId userId;
     private final List<UserIdentity> identities = new ArrayList<>();
-    private final List<MfaFactor> factors = new ArrayList<>();
+    private final List<UserMfaFactor> factors = new ArrayList<>();
 
     private final ChangeSet<UserIdentity> identityChanges = new ChangeSet<>();
-    private final ChangeSet<MfaFactor> factorChanges = new ChangeSet<>();
+    private final ChangeSet<UserMfaFactor> factorChanges = new ChangeSet<>();
 
     private LoginAccount(ShardedId userId) {
         this.userId = userId;
@@ -58,7 +60,7 @@ public class LoginAccount {
 
     /** 仅供持久化层还原：不校验、不产生变更记录 */
     public static LoginAccount reconstitute(ShardedId userId, List<UserIdentity> identities,
-                                            List<MfaFactor> factors) {
+                                            List<UserMfaFactor> factors) {
         LoginAccount account = new LoginAccount(userId);
         account.identities.addAll(identities);
         account.factors.addAll(factors);
@@ -71,7 +73,7 @@ public class LoginAccount {
     public UserIdentity bindIdentity(ShardedId identityId, IdentityIdentifier identityIdentifier) {
         UserIdentity identity = UserIdentity.register(identityId, userId, identityIdentifier);
         if (findIdentity(identityIdentifier).isPresent()) {
-            throw new IdentifierAlreadyBindedException(identityIdentifier);
+            throw new IdentifierAlreadyBoundException(identityIdentifier);
         }
         addIdentityInternal(identity);
         return identity;
@@ -101,7 +103,7 @@ public class LoginAccount {
         if (identities.size() <= 1) {
             throw new InvalidArgumentException("至少保留一个登录身份");
         }
-        for (MfaFactor factor : factors) {
+        for (UserMfaFactor factor : factors) {
             if (factor.references(identityId) && factor.disable()) {
                 factorChanges.dirty(factor.getId(), factor);
             }
@@ -112,14 +114,14 @@ public class LoginAccount {
     // ------------------------------------------------------------------ 二次验证因子
 
     /** 短信/邮箱因子：引用本账号内一个已验证的手机号/邮箱身份 */
-    public MfaFactor addIdentityFactor(ShardedId factorId, ShardedId identityId) {
+    public UserMfaFactor addIdentityFactor(ShardedId factorId, ShardedId identityId) {
         UserIdentity identity = requireIdentity(identityId);
         boolean exists = factors.stream()
                 .anyMatch(f -> f.references(identityId) && !f.isDisabled());
         if (exists) {
             throw new InvalidStatusException("该身份已存在未停用的二次验证因子");
         }
-        MfaFactor factor = MfaFactor.forIdentity(factorId, identity);
+        UserMfaFactor factor = UserMfaFactor.forIdentity(factorId, identity);
 
         addFactorInternal(factor);
         return factor;
@@ -127,14 +129,14 @@ public class LoginAccount {
 
 
     /** TOTP / WebAuthn / 恢复码：secretEncrypted 由应用服务加密后传入 */
-    public MfaFactor addSecretFactor(ShardedId factorId, MfaFactorType type, String secretEncrypted) {
-        MfaFactor factor = MfaFactor.withSecret(factorId, userId, type, secretEncrypted);
+    public UserMfaFactor addSecretFactor(ShardedId factorId, MfaFactorType type, String secretEncrypted) {
+        UserMfaFactor factor = UserMfaFactor.withSecret(factorId, userId, type, secretEncrypted);
         addFactorInternal(factor);
         return factor;
     }
 
     public void enableFactor(ShardedId factorId, Instant at) {
-        MfaFactor factor = requireFactor(factorId);
+        UserMfaFactor factor = requireFactor(factorId);
         if (factor.getIdentityId() != null) {
             // 引用身份的因子：启用时身份必须仍然存在且已验证
             UserIdentity identity = requireIdentity(factor.getIdentityId());
@@ -148,14 +150,14 @@ public class LoginAccount {
     }
 
     public void disableFactor(ShardedId factorId) {
-        MfaFactor factor = requireFactor(factorId);
+        UserMfaFactor factor = requireFactor(factorId);
         if (factor.disable()) {
             factorChanges.dirty(factor.getId(), factor);
         }
     }
 
     public void recordFactorUsed(ShardedId factorId, Instant at) {
-        MfaFactor factor = requireFactor(factorId);
+        UserMfaFactor factor = requireFactor(factorId);
         factor.markUsed(at);
         factorChanges.dirty(factor.getId(), factor);
     }
@@ -171,7 +173,7 @@ public class LoginAccount {
      * 仓储落库顺序：先因子、后身份；身份删除前先释放 lookup，保证失败可重试收敛。
      */
     public void close() {
-        for (MfaFactor factor : List.copyOf(factors)) {
+        for (UserMfaFactor factor : List.copyOf(factors)) {
             removeFactorInternal(factor);
         }
         for (UserIdentity identity : List.copyOf(identities)) {
@@ -185,7 +187,7 @@ public class LoginAccount {
         return Collections.unmodifiableList(identities);
     }
 
-    public List<MfaFactor> getFactors() {
+    public List<UserMfaFactor> getFactors() {
         return Collections.unmodifiableList(factors);
     }
 
@@ -197,13 +199,13 @@ public class LoginAccount {
         return identities.stream().filter(i -> i.matches(identifier)).findFirst();
     }
 
-    public List<MfaFactor> enabledFactors() {
-        return factors.stream().filter(MfaFactor::isEnabled).toList();
+    public List<UserMfaFactor> enabledFactors() {
+        return factors.stream().filter(UserMfaFactor::isEnabled).toList();
     }
 
     /** 是否需要二次验证：只统计状态为启用的因子 */
     public boolean requiresMfa() {
-        return factors.stream().anyMatch(MfaFactor::isEnabled);
+        return factors.stream().anyMatch(UserMfaFactor::isEnabled);
     }
 
     // ------------------------------------------------------------------ 变更集（供仓储使用）
@@ -220,15 +222,15 @@ public class LoginAccount {
         return identityChanges.removedList();
     }
 
-    public List<MfaFactor> addedFactors() {
+    public List<UserMfaFactor> addedFactors() {
         return factorChanges.addedList();
     }
 
-    public List<MfaFactor> dirtyFactors() {
+    public List<UserMfaFactor> dirtyFactors() {
         return factorChanges.dirtyList();
     }
 
-    public List<MfaFactor> removedFactors() {
+    public List<UserMfaFactor> removedFactors() {
         return factorChanges.removedList();
     }
 
@@ -246,12 +248,12 @@ public class LoginAccount {
 
     private UserIdentity requireIdentity(ShardedId identityId) {
         return findIdentity(identityId)
-                .orElseThrow(() -> new InvalidArgumentException("登录身份不存在"));
+                .orElseThrow(() -> new IdentityNotExistException(identityId));
     }
 
-    private MfaFactor requireFactor(ShardedId factorId) {
+    private UserMfaFactor requireFactor(ShardedId factorId) {
         return factors.stream().filter(f -> f.getId().equals(factorId)).findFirst()
-                .orElseThrow(() -> new InvalidArgumentException("二次验证因子不存在"));
+                .orElseThrow(() -> new MfaFactorNotExistException(factorId));
     }
 
     private void addIdentityInternal(UserIdentity identity) {
@@ -259,12 +261,12 @@ public class LoginAccount {
         identityChanges.added(identity.getId(), identity);
     }
 
-    private void addFactorInternal(MfaFactor factor) {
+    private void addFactorInternal(UserMfaFactor factor) {
         factors.add(factor);
         factorChanges.added(factor.getId(), factor);
     }
 
-    private void removeFactorInternal(MfaFactor factor) {
+    private void removeFactorInternal(UserMfaFactor factor) {
         factors.remove(factor);
         factorChanges.removed(factor.getId(), factor);
     }

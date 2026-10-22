@@ -4,7 +4,7 @@ import com.baomidou.mybatisplus.core.toolkit.Wrappers;
 import com.ovelin.mall.auth.domain.exception.IdentifierAlreadyTakenException;
 import com.ovelin.mall.auth.domain.exception.MfaFactorAlreadyExistException;
 import com.ovelin.mall.auth.domain.model.aggregate.LoginAccount;
-import com.ovelin.mall.auth.domain.model.aggregate.MfaFactor;
+import com.ovelin.mall.auth.domain.model.aggregate.UserMfaFactor;
 import com.ovelin.mall.auth.domain.model.aggregate.UserIdentity;
 import com.ovelin.mall.auth.domain.model.identityIdentifier.IdentityIdentifier;
 import com.ovelin.mall.auth.domain.repository.LoginAccountRepository;
@@ -64,7 +64,7 @@ public class LoginAccountRepositoryImpl implements LoginAccountRepository {
         if (identities.isEmpty()) {
             return Optional.empty();
         }
-        List<MfaFactor> factors = factorMapper.selectByUserId(uid)
+        List<UserMfaFactor> factors = factorMapper.selectByUserId(uid)
                 .stream().map(MfaFactorPOConverter::toDomain).toList();
         return Optional.of(LoginAccount.reconstitute(userId, identities, factors));
     }
@@ -198,7 +198,7 @@ public class LoginAccountRepositoryImpl implements LoginAccountRepository {
         }
     }
 
-    private void insertFactor(MfaFactor factor){
+    private void insertFactor(UserMfaFactor factor){
         UserMfaFactorPO po = MfaFactorPOConverter.toPO(factor);
         try {
             factorMapper.insert(po);
@@ -217,7 +217,7 @@ public class LoginAccountRepositoryImpl implements LoginAccountRepository {
                 .eq(UserIdentityPO::getUserId, po.getUserId()));
     }
 
-    private void updateFactor(MfaFactor factor) {
+    private void updateFactor(UserMfaFactor factor) {
         UserMfaFactorPO po = MfaFactorPOConverter.toPO(factor);
         factorMapper.update(null, Wrappers.<UserMfaFactorPO>lambdaUpdate()
                 .set(UserMfaFactorPO::getStatus, po.getStatus())
@@ -233,7 +233,7 @@ public class LoginAccountRepositoryImpl implements LoginAccountRepository {
                 .eq(UserIdentityPO::getUserId, identity.getUserId().value()));
     }
 
-    private void deleteFactor(MfaFactor factor) {
+    private void deleteFactor(UserMfaFactor factor) {
         factorMapper.delete(Wrappers.<UserMfaFactorPO>lambdaQuery()
                 .eq(UserMfaFactorPO::getId, factor.getId().value())
                 .eq(UserMfaFactorPO::getUserId, factor.getUserId().value()));

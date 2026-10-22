@@ -1,8 +1,8 @@
 package com.ovelin.mall.auth.domain.model.agregate;
 
-import com.ovelin.mall.auth.domain.exception.IdentifierAlreadyBindedException;
+import com.ovelin.mall.auth.domain.exception.IdentifierAlreadyBoundException;
 import com.ovelin.mall.auth.domain.model.aggregate.LoginAccount;
-import com.ovelin.mall.auth.domain.model.aggregate.MfaFactor;
+import com.ovelin.mall.auth.domain.model.aggregate.UserMfaFactor;
 import com.ovelin.mall.auth.domain.model.aggregate.UserIdentity;
 import com.ovelin.mall.auth.domain.model.enums.MfaFactorStatus;
 import com.ovelin.mall.auth.domain.model.enums.MfaFactorType;
@@ -91,7 +91,7 @@ class LoginAccountTest {
             LoginAccount account = persistedWithVerifiedPhone();
 
             assertThatThrownBy(() -> account.bindIdentity(EMAIL_ID, PHONE_IDENTITY_IDENTIFIER))
-                    .isInstanceOf(IdentifierAlreadyBindedException.class);
+                    .isInstanceOf(IdentifierAlreadyBoundException.class);
         }
 
         @Test
@@ -174,10 +174,10 @@ class LoginAccountTest {
             account.unbindIdentity(PHONE_ID);
 
             assertThat(account.removedIdentities()).extracting(UserIdentity::getId).containsExactly(PHONE_ID);
-            assertThat(account.dirtyFactors()).extracting(MfaFactor::getId).containsExactly(FACTOR_1);
+            assertThat(account.dirtyFactors()).extracting(UserMfaFactor::getId).containsExactly(FACTOR_1);
             assertThat(account.dirtyFactors().get(0).getStatus()).isEqualTo(MfaFactorStatus.DISABLED);
             // 不引用该身份的因子保持启用
-            assertThat(account.enabledFactors()).extracting(MfaFactor::getId).containsExactly(FACTOR_2);
+            assertThat(account.enabledFactors()).extracting(UserMfaFactor::getId).containsExactly(FACTOR_2);
         }
 
         @Test
@@ -212,12 +212,12 @@ class LoginAccountTest {
                     .isInstanceOf(IllegalStateException.class);
 
             account.verifyIdentity(PHONE_ID, NOW);
-            MfaFactor factor = account.addIdentityFactor(FACTOR_1, PHONE_ID);
+            UserMfaFactor factor = account.addIdentityFactor(FACTOR_1, PHONE_ID);
 
             assertThat(factor.getType()).isEqualTo(MfaFactorType.SMS);
             assertThat(factor.getIdentityId()).isEqualTo(PHONE_ID);
             assertThat(factor.getStatus()).isEqualTo(MfaFactorStatus.PENDING);
-            assertThat(account.addedFactors()).extracting(MfaFactor::getId).containsExactly(FACTOR_1);
+            assertThat(account.addedFactors()).extracting(UserMfaFactor::getId).containsExactly(FACTOR_1);
         }
 
         @Test
@@ -259,7 +259,7 @@ class LoginAccountTest {
         void addsTotpFactorPending() {
             LoginAccount account = persisted();
 
-            MfaFactor factor = account.addSecretFactor(FACTOR_1, MfaFactorType.TOTP, "encrypted");
+            UserMfaFactor factor = account.addSecretFactor(FACTOR_1, MfaFactorType.TOTP, "encrypted");
 
             assertThat(factor.getSecretEncrypted()).isEqualTo("encrypted");
             assertThat(factor.getIdentityId()).isNull();
@@ -294,7 +294,7 @@ class LoginAccountTest {
 
             account.enableFactor(FACTOR_1, NOW);
 
-            MfaFactor factor = account.dirtyFactors().get(0);
+            UserMfaFactor factor = account.dirtyFactors().get(0);
             assertThat(factor.getStatus()).isEqualTo(MfaFactorStatus.ENABLED);
             assertThat(factor.getVerifiedAt()).isEqualTo(NOW);
             assertThat(account.requiresMfa()).isTrue();
@@ -334,7 +334,7 @@ class LoginAccountTest {
 
             account.recordFactorUsed(FACTOR_1, NOW);
 
-            assertThat(account.dirtyFactors()).extracting(MfaFactor::getId).containsExactly(FACTOR_1);
+            assertThat(account.dirtyFactors()).extracting(UserMfaFactor::getId).containsExactly(FACTOR_1);
             assertThat(account.dirtyFactors().get(0).getLastUsedAt()).isEqualTo(NOW);
         }
 
@@ -347,7 +347,7 @@ class LoginAccountTest {
             account.removeFactor(FACTOR_1);
 
             assertThat(account.getFactors()).isEmpty();
-            assertThat(account.removedFactors()).extracting(MfaFactor::getId).containsExactly(FACTOR_1);
+            assertThat(account.removedFactors()).extracting(UserMfaFactor::getId).containsExactly(FACTOR_1);
         }
 
         @Test
@@ -373,7 +373,7 @@ class LoginAccountTest {
 
             assertThat(account.getIdentities()).isEmpty();
             assertThat(account.getFactors()).isEmpty();
-            assertThat(account.removedFactors()).extracting(MfaFactor::getId)
+            assertThat(account.removedFactors()).extracting(UserMfaFactor::getId)
                     .containsExactlyInAnyOrder(FACTOR_1, FACTOR_2);
             assertThat(account.removedIdentities()).extracting(UserIdentity::getId)
                     .containsExactlyInAnyOrder(USERNAME_ID, PHONE_ID);

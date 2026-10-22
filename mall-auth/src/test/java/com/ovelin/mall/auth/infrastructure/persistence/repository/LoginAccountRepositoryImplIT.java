@@ -5,7 +5,7 @@ import com.ovelin.mall.auth.application.port.AuthIdFactory;
 import com.ovelin.mall.auth.domain.exception.IdentifierAlreadyTakenException;
 import com.ovelin.mall.auth.domain.exception.IdentifierNotOwnedByUserException;
 import com.ovelin.mall.auth.domain.model.aggregate.LoginAccount;
-import com.ovelin.mall.auth.domain.model.aggregate.MfaFactor;
+import com.ovelin.mall.auth.domain.model.aggregate.UserMfaFactor;
 import com.ovelin.mall.auth.domain.model.aggregate.UserIdentity;
 import com.ovelin.mall.auth.domain.model.enums.IdentityLookupStatus;
 import com.ovelin.mall.auth.domain.model.enums.MfaFactorType;
@@ -292,7 +292,7 @@ class LoginAccountRepositoryImplIT extends AuthIntegrationTestSupport {
             ShardedId emailId = authIdFactory.newIdentityId(userId);
             loaded.bindIdentity(emailId, EMAIL);
             loaded.verifyIdentity(emailId, now());
-            MfaFactor factor = loaded.addIdentityFactor(authIdFactory.newFactorId(userId), emailId);
+            UserMfaFactor factor = loaded.addIdentityFactor(authIdFactory.newFactorId(userId), emailId);
             loaded.enableFactor(factor.getId(), now());
             loaded.addSecretFactor(authIdFactory.newFactorId(userId), MfaFactorType.TOTP, "encrypted-secret");
             repository.update(loaded);
@@ -655,12 +655,12 @@ class LoginAccountRepositoryImplIT extends AuthIntegrationTestSupport {
             assertThat(laIdentity.getLastLoginAt()).isEqualTo(identity.getLastLoginAt());
         }
 
-        List<MfaFactor> expectedFactors = sortedById(account.getFactors(), MfaFactor::getId);
-        List<MfaFactor> actualFactors = sortedById(la.getFactors(), MfaFactor::getId);
+        List<UserMfaFactor> expectedFactors = sortedById(account.getFactors(), UserMfaFactor::getId);
+        List<UserMfaFactor> actualFactors = sortedById(la.getFactors(), UserMfaFactor::getId);
         assertThat(actualFactors).hasSize(expectedFactors.size());
         for (int i = 0; i < expectedFactors.size(); i++) {
-            MfaFactor factor = expectedFactors.get(i);
-            MfaFactor laFactor = actualFactors.get(i);
+            UserMfaFactor factor = expectedFactors.get(i);
+            UserMfaFactor laFactor = actualFactors.get(i);
 
             assertThat(laFactor.getId()).isEqualTo(factor.getId());
             assertThat(laFactor.getType()).isEqualTo(factor.getType());

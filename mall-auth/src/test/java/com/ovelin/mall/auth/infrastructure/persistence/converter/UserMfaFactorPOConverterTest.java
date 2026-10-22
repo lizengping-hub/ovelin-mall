@@ -1,6 +1,6 @@
 package com.ovelin.mall.auth.infrastructure.persistence.converter;
 
-import com.ovelin.mall.auth.domain.model.aggregate.MfaFactor;
+import com.ovelin.mall.auth.domain.model.aggregate.UserMfaFactor;
 import com.ovelin.mall.auth.domain.model.enums.MfaFactorStatus;
 import com.ovelin.mall.auth.domain.model.enums.MfaFactorType;
 import com.ovelin.mall.auth.infrastructure.persistence.convertor.MfaFactorPOConverter;
@@ -13,7 +13,7 @@ import java.time.Instant;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-class MfaFactorPOConverterTest {
+class UserMfaFactorPOConverterTest {
 
     private static final ShardedId FACTOR_ID = ShardedId.of(1, 100L);
     private static final ShardedId USER_ID = ShardedId.of(1, 200L);
@@ -37,7 +37,7 @@ class MfaFactorPOConverterTest {
         po.setVerifiedAt(VERIFIED_AT);
         po.setLastUsedAt(LAST_USED_AT);
 
-        MfaFactor factor = MfaFactorPOConverter.toDomain(po);
+        UserMfaFactor factor = MfaFactorPOConverter.toDomain(po);
 
         assertThat(factor.getId()).isEqualTo(FACTOR_ID);
         assertThat(factor.getUserId()).isEqualTo(USER_ID);
@@ -60,7 +60,7 @@ class MfaFactorPOConverterTest {
         po.setSecretEncrypted("encrypted-secret");
         po.setStatus(MfaFactorStatus.ENABLED.getCode());
 
-        MfaFactor factor = MfaFactorPOConverter.toDomain(po);
+        UserMfaFactor factor = MfaFactorPOConverter.toDomain(po);
 
         assertThat(factor.getIdentityId()).isNull();
     }
@@ -68,7 +68,7 @@ class MfaFactorPOConverterTest {
     @Test
     @DisplayName("toPO：正确转换所有字段")
     void toPOConvertsAllFields() {
-        MfaFactor factor = MfaFactor.reconstitute(
+        UserMfaFactor factor = UserMfaFactor.reconstitute(
                 FACTOR_ID,
                 USER_ID,
                 MfaFactorType.TOTP,
@@ -94,7 +94,7 @@ class MfaFactorPOConverterTest {
     @Test
     @DisplayName("toPO：identityId 为空时保留 null")
     void toPOAllowsNullIdentityId() {
-        MfaFactor factor = MfaFactor.reconstitute(
+        UserMfaFactor factor = UserMfaFactor.reconstitute(
                 FACTOR_ID,
                 USER_ID,
                 MfaFactorType.TOTP,

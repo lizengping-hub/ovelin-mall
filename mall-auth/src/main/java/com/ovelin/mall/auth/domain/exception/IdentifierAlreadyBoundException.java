@@ -5,8 +5,9 @@ import com.ovelin.mall.auth.domain.exception.face.AuthErrorCode;
 import com.ovelin.mall.auth.domain.model.identityIdentifier.IdentityIdentifier;
 
 
-public class IdentifierAlreadyBindedException extends AuthDomainException {
-    public IdentifierAlreadyBindedException(IdentityIdentifier identifier){
-        super(AuthErrorCode.IDENTIFIER_ALREADY_BINDED, identifier + " already added");
+public class IdentifierAlreadyBoundException extends AuthDomainException {
+    public IdentifierAlreadyBoundException(IdentityIdentifier identifier){
+        super(AuthErrorCode.IDENTIFIER_ALREADY_BOUND, identifier + " already added");
     }
 }
+

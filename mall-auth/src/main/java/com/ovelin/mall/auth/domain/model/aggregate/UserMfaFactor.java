@@ -15,7 +15,7 @@ import java.time.Instant;
  * 修改方法返回"是否发生变化"，供聚合根决定是否记入变更集。
  */
 @Getter
-public class MfaFactor {
+public class UserMfaFactor {
 
     private final ShardedId id;
     private final ShardedId userId;
@@ -26,8 +26,8 @@ public class MfaFactor {
     private Instant verifiedAt;
     private Instant lastUsedAt;
 
-    private MfaFactor(ShardedId id, ShardedId userId, MfaFactorType type, ShardedId identityId,
-                      String secretEncrypted, MfaFactorStatus status, Instant verifiedAt, Instant lastUsedAt) {
+    private UserMfaFactor(ShardedId id, ShardedId userId, MfaFactorType type, ShardedId identityId,
+                          String secretEncrypted, MfaFactorStatus status, Instant verifiedAt, Instant lastUsedAt) {
         this.id = id;
         this.userId = userId;
         this.type = type;
@@ -39,35 +39,37 @@ public class MfaFactor {
     }
 
     /** 短信/邮箱因子：引用一个已验证的身份，不存密钥。仅由 LoginAccount 调用 */
-    static MfaFactor forIdentity(ShardedId id, UserIdentity identity) {
+    static UserMfaFactor forIdentity(ShardedId id, UserIdentity identity) {
         if (!identity.canReceiveCode()) {
-            throw new IllegalStateException("该身份不能用于二次验证：必须是已验证的手机号或邮箱");
+            throw new InvalidArgumentException("该身份不能用于二次验证：必须是已验证的手机号或邮箱");
         }
         requireSameShard(id, identity.getUserId());
         MfaFactorType type = identity.type() == IdentityType.PHONE ? MfaFactorType.SMS : MfaFactorType.EMAIL;
-        return new MfaFactor(id, identity.getUserId(), type, identity.getId(), null,
+        return new UserMfaFactor(id, identity.getUserId(), type, identity.getId(), null,
                 MfaFactorStatus.PENDING, null, null);
     }
 
     /** TOTP / WebAuthn / 恢复码：secretEncrypted 由应用服务加密后传入。仅由 LoginAccount 调用 */
-    static MfaFactor withSecret(ShardedId id, ShardedId userId, MfaFactorType type, String secretEncrypted) {
+    static UserMfaFactor withSecret(ShardedId id, ShardedId userId, MfaFactorType type, String secretEncrypted) {
         if (type.referencesIdentity()) {
-            throw new InvalidArgumentException("短信/邮箱因子请使用 addIdentityFactor");
+            // 编码错误
+            throw new IllegalArgumentException("短信/邮箱因子请使用 addIdentityFactor");
         }
         requireSameShard(id, userId);
-        return new MfaFactor(id, userId, type, null, secretEncrypted, MfaFactorStatus.PENDING, null, null);
+        return new UserMfaFactor(id, userId, type, null, secretEncrypted, MfaFactorStatus.PENDING, null, null);
     }
 
     /** 仅供持久化层还原，不做校验 */
-    public static MfaFactor reconstitute(ShardedId id, ShardedId userId, MfaFactorType type, ShardedId identityId,
-                                         String secretEncrypted, MfaFactorStatus status,
-                                         Instant verifiedAt, Instant lastUsedAt) {
-        return new MfaFactor(id, userId, type, identityId, secretEncrypted, status, verifiedAt, lastUsedAt);
+    public static UserMfaFactor reconstitute(ShardedId id, ShardedId userId, MfaFactorType type, ShardedId identityId,
+                                             String secretEncrypted, MfaFactorStatus status,
+                                             Instant verifiedAt, Instant lastUsedAt) {
+        return new UserMfaFactor(id, userId, type, identityId, secretEncrypted, status, verifiedAt, lastUsedAt);
     }
 
     private static void requireSameShard(ShardedId id, ShardedId userId) {
         if (!id.hasSameShard(userId)) {
-            throw new InvalidArgumentException("因子记录必须与用户落在同一分片");
+            // 编码错误不抛出业务异常
+            throw new IllegalArgumentException("因子记录必须与用户落在同一分片");
         }
     }
 
