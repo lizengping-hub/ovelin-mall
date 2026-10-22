@@ -3,6 +3,7 @@ package com.ovelin.mall.auth.domain.model.aggregate;
 import com.ovelin.mall.auth.domain.exception.IdentifierAlreadyBoundException;
 import com.ovelin.mall.auth.domain.exception.IdentityNotExistException;
 import com.ovelin.mall.auth.domain.exception.MfaFactorNotExistException;
+import com.ovelin.mall.auth.domain.model.enums.LoginAccountStatus;
 import com.ovelin.mall.auth.domain.model.enums.MfaFactorType;
 import com.ovelin.mall.auth.domain.model.identityIdentifier.IdentityIdentifier;
 import com.ovelin.mall.common.exception.global.InvalidArgumentException;
@@ -25,7 +26,7 @@ import java.util.*;
  * </ul>
  * 密码（UserPassword）不在本聚合内：它只有自己的规则，且登录失败计数是高频写，单独成聚合避免写冲突。
  * <p>
- * 变更跟踪：聚合内部记录新增/修改/删除的子实体，仓储 save 后调用 {@link #clearChanges()}。
+ * 变更跟踪：聚合内部记录新增/修改/删除的子实体，仓储 save 后调用 {@link #makeSaved()}。
  * 子实体的构造与修改方法均为包级可见，外部只能通过本聚合根操作。
  */
 public class LoginAccount {
@@ -34,8 +35,8 @@ public class LoginAccount {
     private final ShardedId userId;
     @Getter
     private long version;
-    @Getter
-    private boolean isNew;
+
+    private LoginAccountStatus status;
     private final List<UserIdentity> identities = new ArrayList<>();
     private final List<UserMfaFactor> factors = new ArrayList<>();
 
@@ -45,7 +46,7 @@ public class LoginAccount {
     private LoginAccount(ShardedId userId, long version, boolean isNew) {
         this.userId = userId;
         this.version = version;
-        this.isNew = isNew;
+        if (isNew) this.status = LoginAccountStatus.CREATING;
     }
 
     // ------------------------------------------------------------------ 创建 / 还原
@@ -67,13 +68,34 @@ public class LoginAccount {
         account.factors.addAll(factors);
         return account;
     }
+    public boolean isNew(){
+        return status == LoginAccountStatus.CREATING;
+    }
+    public boolean isClose(){
+        return status == LoginAccountStatus.CLOSING;
+    }
+    public boolean isClosed(){
+        return status == LoginAccountStatus.CLOSED;
+    }
 
-    public void unNew(){
-        this.isNew = false;
+    /**
+     * 该操作会把LoginAccount 从isNew和isClosing中脱离出来，并且会删掉变化，使得LoginAccount的状态和数据库一致
+     * <p>注意：并不会回滚对内存中LoginAccount的修改</p>
+     */
+    public void makeSaved(){
+        if (status == LoginAccountStatus.CREATING){
+            status = LoginAccountStatus.ACTIVE;
+        } else if (status == LoginAccountStatus.CLOSING){
+            status = LoginAccountStatus.CLOSED;
+        } else {
+            version ++;
+        }
+
+        if (this.hasChanges()){
+            this.clearChanges();
+        }
     }
-    public void increaseVersion(){
-        version ++;
-    }
+
     // ------------------------------------------------------------------ 身份
 
     /** 新增登录身份（未验证） */
@@ -182,6 +204,7 @@ public class LoginAccount {
      * 仓储落库顺序：先因子、后身份；身份删除前先释放 lookup，保证失败可重试收敛。
      */
     public void close() {
+        this.status = LoginAccountStatus.CLOSING;
         for (UserMfaFactor factor : List.copyOf(factors)) {
             removeFactorInternal(factor);
         }
@@ -248,7 +271,7 @@ public class LoginAccount {
     }
 
     /** 仓储 add/update 成功后调用 */
-    public void clearChanges() {
+    private void clearChanges() {
         identityChanges.clear();
         factorChanges.clear();
     }

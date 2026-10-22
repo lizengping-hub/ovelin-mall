@@ -9,10 +9,10 @@ import java.io.Serializable;
 
 @Mapper
 public interface LoginAccountMapper extends BaseMapper<LoginAccountPO> {
-    default LoginAccountPO selectByUserId(Serializable userId){
+    default LoginAccountPO selectByUserId(long userId){
         return this.selectById(userId);
     }
-    default int deleteByUserId(Serializable userId){
+    default int deleteByUserId(long userId){
         return this.deleteById(userId);
     }
     default int updateByUserId(LoginAccountPO po){

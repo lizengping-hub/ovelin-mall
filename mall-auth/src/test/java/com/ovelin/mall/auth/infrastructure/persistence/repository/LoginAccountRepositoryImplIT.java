@@ -70,7 +70,7 @@ import static org.mockito.Mockito.*;
 class LoginAccountRepositoryImplIT extends AuthIntegrationTestSupport {
 
     private static final IdentityIdentifier PHONE =
-            PhoneIdentifier.parseRawInput("13800000001");
+            PhoneIdentifier.from("13800000001");
     private static final IdentityIdentifier EMAIL =
             EmailIdentifier.from("test@example.com");
     @Autowired
@@ -129,6 +129,16 @@ class LoginAccountRepositoryImplIT extends AuthIntegrationTestSupport {
             ShardedId missingId = newId("user");
             assertThat(repository.findByUserId(missingId)).isEmpty();
         }
+
+        @Test
+        @DisplayName("查询不存在的 userId 应返回空")
+        void findByUserId_onlyHasIdentity_returnsEmpty() {
+            ShardedId userId = newId("user");
+            UserIdentityPO ui = newUserIdentityPO(userId);
+            identityMapper.insert(ui);
+            assertThat(repository.findByUserId(userId)).isEmpty();
+        }
+
 
         @Test
         @DisplayName("能够 还原Identities")
@@ -388,7 +398,8 @@ class LoginAccountRepositoryImplIT extends AuthIntegrationTestSupport {
             LoginAccount loaded = load(userId);
             loaded.close();
             repository.save(loaded);
-
+            assertThat(repository.findByUserId(userId)).isEmpty();
+            assertThat(loginAccountMapper.selectByUserId(userId.value())).isNull();
             assertThat(identityMapper.selectByUserId(userId.value())).isEmpty();
             assertThat(factorMapper.selectByUserId(userId.value())).isEmpty();
             assertThat(repository.findUserIdByIdentity(PHONE)).isEmpty();

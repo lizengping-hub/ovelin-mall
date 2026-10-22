@@ -84,6 +84,7 @@ public class LoginAccountRepositoryImpl implements LoginAccountRepository {
 
     @Override
     public void save(LoginAccount account) {
+        if (account.isClosed()) return;
         if (!account.hasChanges()) return;
         if (canSimpleInsert(account)) simpleInsert(account);
         else persistWithLookup(account);
@@ -116,8 +117,7 @@ public class LoginAccountRepositoryImpl implements LoginAccountRepository {
             lookup.insertConfirmed(identity.getIdentifier(), account.getUserId());
             insertAccount(account);
         });
-        account.clearChanges();
-        account.unNew();
+        account.makeSaved();
     }
 
     private void persistWithLookup(LoginAccount account) {
@@ -149,11 +149,7 @@ public class LoginAccountRepositoryImpl implements LoginAccountRepository {
             }
             throw e;
         }
-        account.clearChanges();
-        if (!account.isNew()){
-            account.increaseVersion();
-        }
-        account.unNew();
+        account.makeSaved();
     }
     // ------------------------------------------------------------------ 落库（同分片本地事务内）
     private void insertAccount(LoginAccount account){
@@ -174,9 +170,11 @@ public class LoginAccountRepositoryImpl implements LoginAccountRepository {
 
 
     private void saveAccountSingle(LoginAccount account){
-        if (account.isNew()){
+         if (account.isNew()){
             insertAccountSingle(account, true);
-        } else {
+        } else if (account.isClose()){
+             loginAccountMapper.deleteByUserId(account.getUserId().value());
+         } else{
             updateAccountSingle(account);
         }
     }

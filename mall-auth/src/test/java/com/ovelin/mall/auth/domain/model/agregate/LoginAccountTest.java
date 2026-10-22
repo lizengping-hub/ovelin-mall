@@ -27,7 +27,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 class LoginAccountTest {
 
     private static final Instant NOW = Instant.parse("2026-10-14T00:00:00Z");
-    private static final IdentityIdentifier PHONE_IDENTITY_IDENTIFIER = PhoneIdentifier.parseRawInput("13800000000");
+    private static final IdentityIdentifier PHONE_IDENTITY_IDENTIFIER = PhoneIdentifier.from("13800000000");
     private static final IdentityIdentifier USERNAME_IDENTITY_IDENTIFIER = UserNameIdentifier.from("alice");
     private static final ShardedId USER = of(1, 100);
     private static final ShardedId USERNAME_ID = of(1, 101);
@@ -40,7 +40,7 @@ class LoginAccountTest {
     /** 刚注册：只有一个 username 身份，变更集已清空（相当于从库里还原出来） */
     private static LoginAccount persisted() {
         LoginAccount account = LoginAccount.open(USER, USERNAME_ID, USERNAME_IDENTITY_IDENTIFIER);
-        account.clearChanges();
+        account.makeSaved();
         return account;
     }
 
@@ -49,7 +49,7 @@ class LoginAccountTest {
         LoginAccount account = persisted();
         account.bindIdentity(PHONE_ID, PHONE_IDENTITY_IDENTIFIER);
         account.verifyIdentity(PHONE_ID, NOW);
-        account.clearChanges();
+        account.makeSaved();
         return account;
     }
 
@@ -67,10 +67,12 @@ class LoginAccountTest {
             assertThat(account.getFactors()).isEmpty();
             assertThat(account.hasChanges()).isTrue();
 
-            account.unNew();
+            account.makeSaved();
             assertThat(account.isNew()).isFalse();
-            account.increaseVersion();
-            assertThat(account.getVersion()).isEqualTo(1);
+            assertThat(account.hasChanges()).isFalse();
+            assertThat(account.getVersion()).isZero();
+
+
         }
 
         @Test
@@ -92,6 +94,11 @@ class LoginAccountTest {
             assertThat(phone.isVerified()).isFalse();
             assertThat(account.getIdentities()).hasSize(2);
             assertThat(account.addedIdentities()).extracting(UserIdentity::getId).containsExactly(PHONE_ID);
+
+            account.makeSaved();
+            assertThat(account.isNew()).isFalse();
+            assertThat(account.hasChanges()).isFalse();
+            assertThat(account.getVersion()).isEqualTo(1);
         }
 
         @Test
@@ -118,12 +125,12 @@ class LoginAccountTest {
         void verifyMarksIdentityDirtyOnlyOnce() {
             LoginAccount account = persisted();
             account.bindIdentity(PHONE_ID, PHONE_IDENTITY_IDENTIFIER);
-            account.clearChanges();
+            account.makeSaved();
 
             account.verifyIdentity(PHONE_ID, NOW);
             assertThat(account.dirtyIdentities()).extracting(UserIdentity::getId).containsExactly(PHONE_ID);
 
-            account.clearChanges();
+            account.makeSaved();
             account.verifyIdentity(PHONE_ID, NOW.plusSeconds(60));
             assertThat(account.hasChanges()).isFalse();
         }
@@ -177,7 +184,7 @@ class LoginAccountTest {
             account.enableFactor(FACTOR_1, NOW);
             account.addSecretFactor(FACTOR_2, MfaFactorType.TOTP, "secret");
             account.enableFactor(FACTOR_2, NOW);
-            account.clearChanges();
+            account.makeSaved();
 
             account.unbindIdentity(PHONE_ID);
 
@@ -297,7 +304,7 @@ class LoginAccountTest {
         void enableSetsStatusVerifiedAtAndMarksDirty() {
             LoginAccount account = persisted();
             account.addSecretFactor(FACTOR_1, MfaFactorType.TOTP, "s");
-            account.clearChanges();
+            account.makeSaved();
 
             account.enableFactor(FACTOR_1, NOW);
 
@@ -326,7 +333,7 @@ class LoginAccountTest {
             LoginAccount account = persisted();
             account.addSecretFactor(FACTOR_1, MfaFactorType.TOTP, "s");
             account.disableFactor(FACTOR_1);
-            account.clearChanges();
+            account.makeSaved();
 
             account.disableFactor(FACTOR_1);
 
@@ -337,7 +344,7 @@ class LoginAccountTest {
         void recordFactorUsedMarksDirty() {
             LoginAccount account = persisted();
             account.addSecretFactor(FACTOR_1, MfaFactorType.TOTP, "s");
-            account.clearChanges();
+            account.makeSaved();
 
             account.recordFactorUsed(FACTOR_1, NOW);
 
@@ -349,7 +356,7 @@ class LoginAccountTest {
         void removeFactorRecordsRemovedChange() {
             LoginAccount account = persisted();
             account.addSecretFactor(FACTOR_1, MfaFactorType.TOTP, "s");
-            account.clearChanges();
+            account.makeSaved();
 
             account.removeFactor(FACTOR_1);
 
@@ -374,7 +381,7 @@ class LoginAccountTest {
             LoginAccount account = persistedWithVerifiedPhone();
             account.addIdentityFactor(FACTOR_1, PHONE_ID);
             account.addSecretFactor(FACTOR_2, MfaFactorType.TOTP, "s");
-            account.clearChanges();
+            account.makeSaved();
 
             account.close();
 
@@ -405,13 +412,13 @@ class LoginAccountTest {
         }
 
         @Test
-        void clearChangesEmptiesAllChangeSets() {
+        void makeSaveEmptiesAllChangeSets() {
             LoginAccount account = persisted();
             account.bindIdentity(PHONE_ID, PHONE_IDENTITY_IDENTIFIER);
             account.recordLogin(USERNAME_ID, NOW);
             account.addSecretFactor(FACTOR_1, MfaFactorType.TOTP, "s");
 
-            account.clearChanges();
+            account.makeSaved();
 
             assertThat(account.hasChanges()).isFalse();
             assertThat(account.addedIdentities()).isEmpty();
