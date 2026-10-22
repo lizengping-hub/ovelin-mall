@@ -3,7 +3,7 @@ package com.ovelin.mall.auth.infrastructure.persistence.converter;
 import com.ovelin.mall.auth.domain.model.aggregate.UserMfaFactor;
 import com.ovelin.mall.auth.domain.model.enums.MfaFactorStatus;
 import com.ovelin.mall.auth.domain.model.enums.MfaFactorType;
-import com.ovelin.mall.auth.infrastructure.persistence.convertor.MfaFactorPOConverter;
+import com.ovelin.mall.auth.infrastructure.persistence.convertor.UserMfaFactorPOConverter;
 import com.ovelin.mall.auth.infrastructure.persistence.po.UserMfaFactorPO;
 import com.ovelin.mall.common.sharding.core.ov.ShardedId;
 import org.junit.jupiter.api.DisplayName;
@@ -37,7 +37,7 @@ class UserMfaFactorPOConverterTest {
         po.setVerifiedAt(VERIFIED_AT);
         po.setLastUsedAt(LAST_USED_AT);
 
-        UserMfaFactor factor = MfaFactorPOConverter.toDomain(po);
+        UserMfaFactor factor = UserMfaFactorPOConverter.toDomain(po);
 
         assertThat(factor.getId()).isEqualTo(FACTOR_ID);
         assertThat(factor.getUserId()).isEqualTo(USER_ID);
@@ -60,7 +60,7 @@ class UserMfaFactorPOConverterTest {
         po.setSecretEncrypted("encrypted-secret");
         po.setStatus(MfaFactorStatus.ENABLED.getCode());
 
-        UserMfaFactor factor = MfaFactorPOConverter.toDomain(po);
+        UserMfaFactor factor = UserMfaFactorPOConverter.toDomain(po);
 
         assertThat(factor.getIdentityId()).isNull();
     }
@@ -79,7 +79,7 @@ class UserMfaFactorPOConverterTest {
                 LAST_USED_AT
         );
 
-        UserMfaFactorPO po = MfaFactorPOConverter.toPO(factor);
+        UserMfaFactorPO po = UserMfaFactorPOConverter.toPO(factor);
 
         assertThat(po.getId()).isEqualTo(FACTOR_ID.value());
         assertThat(po.getUserId()).isEqualTo(USER_ID.value());
@@ -105,7 +105,7 @@ class UserMfaFactorPOConverterTest {
                 null
         );
 
-        UserMfaFactorPO po = MfaFactorPOConverter.toPO(factor);
+        UserMfaFactorPO po = UserMfaFactorPOConverter.toPO(factor);
 
         assertThat(po.getIdentityId()).isNull();
         assertThat(po.getVerifiedAt()).isNull();

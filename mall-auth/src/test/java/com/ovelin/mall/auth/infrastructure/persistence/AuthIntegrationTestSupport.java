@@ -16,6 +16,7 @@ import java.util.List;
 @SpringBootTest
 public abstract class AuthIntegrationTestSupport {
     private static final ShardId SHARD = ShardId.of(1);
+    private static final List<String> TABLES = List.of("login_account","user_identity", "identity_lookup", "user_password", "user_mfa_factor", "user");
     @Autowired
     protected JdbcTemplate jdbcTemplate;
 
@@ -24,7 +25,7 @@ public abstract class AuthIntegrationTestSupport {
 
     @BeforeEach
     void cleanTables() {
-        for (String table : List.of("user_identity", "identity_lookup", "user_password", "user_mfa_factor", "user")) {
+        for (String table : TABLES) {
             jdbcTemplate.update("delete from " + table);
         }
     }

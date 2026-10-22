@@ -6,9 +6,9 @@ import com.ovelin.mall.auth.domain.model.enums.MfaFactorType;
 import com.ovelin.mall.auth.infrastructure.persistence.po.UserMfaFactorPO;
 import com.ovelin.mall.common.sharding.core.ov.ShardedId;
 
-public final class MfaFactorPOConverter {
+public final class UserMfaFactorPOConverter {
 
-    private MfaFactorPOConverter() {
+    private UserMfaFactorPOConverter() {
     }
 
     public static UserMfaFactor toDomain(UserMfaFactorPO po) {

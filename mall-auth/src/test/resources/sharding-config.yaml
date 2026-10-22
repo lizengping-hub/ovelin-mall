@@ -38,6 +38,16 @@ rules:
         standard:
           shardingColumn: id
           shardingAlgorithmName: ovelin_table_algo
+    login_account:
+      actualDataNodes: auth_ds_$->{0..1}.login_account_$->{0..1}
+      databaseStrategy:
+        standard:
+          shardingColumn: user_id
+          shardingAlgorithmName: ovelin_db_algo
+      tableStrategy:
+        standard:
+          shardingColumn: user_id
+          shardingAlgorithmName: ovelin_table_algo
     user_identity:
       actualDataNodes: auth_ds_$->{0..1}.user_identity_$->{0..1}
       databaseStrategy:

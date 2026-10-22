@@ -1,6 +1,8 @@
 package com.ovelin.mall.auth.infrastructure.persistence.repository;
 
 import com.baomidou.mybatisplus.core.toolkit.Wrappers;
+import com.ovelin.mall.auth.domain.exception.AccountAlreadyExistException;
+import com.ovelin.mall.auth.domain.exception.AccountStatusChangedException;
 import com.ovelin.mall.auth.domain.exception.IdentifierAlreadyTakenException;
 import com.ovelin.mall.auth.domain.exception.MfaFactorAlreadyExistException;
 import com.ovelin.mall.auth.domain.model.aggregate.LoginAccount;
@@ -10,12 +12,15 @@ import com.ovelin.mall.auth.domain.model.identityIdentifier.IdentityIdentifier;
 import com.ovelin.mall.auth.domain.repository.LoginAccountRepository;
 
 
-import com.ovelin.mall.auth.infrastructure.persistence.convertor.MfaFactorPOConverter;
+import com.ovelin.mall.auth.infrastructure.persistence.convertor.LoginAccountPOConverter;
+import com.ovelin.mall.auth.infrastructure.persistence.convertor.UserMfaFactorPOConverter;
 import com.ovelin.mall.auth.infrastructure.persistence.convertor.UserIdentityPOConverter;
 import com.ovelin.mall.auth.infrastructure.persistence.gateway.IdentityLookupGateway;
+import com.ovelin.mall.auth.infrastructure.persistence.mapper.LoginAccountMapper;
 import com.ovelin.mall.auth.infrastructure.persistence.mapper.UserIdentityMapper;
 
 import com.ovelin.mall.auth.infrastructure.persistence.mapper.UserMfaFactorMapper;
+import com.ovelin.mall.auth.infrastructure.persistence.po.LoginAccountPO;
 import com.ovelin.mall.auth.infrastructure.persistence.po.UserIdentityPO;
 import com.ovelin.mall.auth.infrastructure.persistence.po.UserMfaFactorPO;
 import com.ovelin.mall.common.sharding.core.api.ShardResolver;
@@ -49,7 +54,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
 @Repository
 @RequiredArgsConstructor
 public class LoginAccountRepositoryImpl implements LoginAccountRepository {
-
+    private final LoginAccountMapper loginAccountMapper;
     private final UserIdentityMapper identityMapper;
     private final UserMfaFactorMapper factorMapper;
     private final IdentityLookupGateway lookup;
@@ -59,14 +64,16 @@ public class LoginAccountRepositoryImpl implements LoginAccountRepository {
     @Override
     public Optional<LoginAccount> findByUserId(ShardedId userId) {
         Long uid = userId.value();
-        List<UserIdentity> identities = identityMapper.selectByUserId(uid)
-                .stream().map(UserIdentityPOConverter::toDomain).toList();
-        if (identities.isEmpty()) {
+        LoginAccountPO accountPO = loginAccountMapper.selectByUserId(uid);
+        if (accountPO == null) {
             return Optional.empty();
         }
+        List<UserIdentity> identities = identityMapper.selectByUserId(uid)
+                .stream().map(UserIdentityPOConverter::toDomain).toList();
+
         List<UserMfaFactor> factors = factorMapper.selectByUserId(uid)
-                .stream().map(MfaFactorPOConverter::toDomain).toList();
-        return Optional.of(LoginAccount.reconstitute(userId, identities, factors));
+                .stream().map(UserMfaFactorPOConverter::toDomain).toList();
+        return Optional.of(LoginAccount.reconstitute(userId, accountPO.getVersion(), identities, factors));
     }
 
     @Override
@@ -74,30 +81,22 @@ public class LoginAccountRepositoryImpl implements LoginAccountRepository {
         return lookup.findUserId(identityIdentifier);
     }
 
-    /**
-     * 仅在注册场景下使用
-     */
-    @Override
-    public void add(LoginAccount account) {
-        if (!account.hasChanges()) return;
-        save(account,canSimpleInsert(account));
-    }
 
     @Override
-    public void update(LoginAccount account) {
+    public void save(LoginAccount account) {
         if (!account.hasChanges()) return;
-        save(account, false);
-    }
-
-    private void save(LoginAccount account, boolean simplerInsert){
-        if (simplerInsert) simpleInsert(account);
+        if (canSimpleInsert(account)) simpleInsert(account);
         else persistWithLookup(account);
     }
+
     /**
      * 检查是否是使用单个身份注册的场景，仅限 public void insert(LoginAccount account)
      * */
     private boolean canSimpleInsert(LoginAccount account){
         List<UserIdentity> identities = account.addedIdentities();
+        if (!account.isNew()){
+            return false;
+        }
         if (identities.size() == 1){
             UserIdentity identity = identities.getFirst();
             ShardId shardId = shardResolver.resolve(identity.type().getCode(), identity.value());
@@ -111,12 +110,14 @@ public class LoginAccountRepositoryImpl implements LoginAccountRepository {
      * 用于初次，使用单个身份注册的场景，仅限 public void insert(LoginAccount account)
      */
     private void simpleInsert(LoginAccount account){
+
         UserIdentity identity = account.addedIdentities().getFirst();
         tx.executeWithoutResult(s -> {
             lookup.insertConfirmed(identity.getIdentifier(), account.getUserId());
-            insertRows(account);
+            insertAccount(account);
         });
         account.clearChanges();
+        account.unNew();
     }
 
     private void persistWithLookup(LoginAccount account) {
@@ -138,7 +139,7 @@ public class LoginAccountRepositoryImpl implements LoginAccountRepository {
             tx.executeWithoutResult(status -> {
                 registerLookupCallbacks(reserved, releasing, userId);
                 callbacksRegistered.set(true);
-                writeRows(account);
+                writeAccount(account);
             });
         } catch (RuntimeException e) {
             // 回调还没注册的失败（reserve / beginRelease 中途失败、事务没能开始）只能在这里补偿；
@@ -149,61 +150,83 @@ public class LoginAccountRepositoryImpl implements LoginAccountRepository {
             throw e;
         }
         account.clearChanges();
+        if (!account.isNew()){
+            account.increaseVersion();
+        }
+        account.unNew();
     }
     // ------------------------------------------------------------------ 落库（同分片本地事务内）
-    private void insertRows(LoginAccount account){
-        account.addedIdentities().forEach(this::insertIdentity);
-        account.addedFactors().forEach(this::insertFactor);
+    private void insertAccount(LoginAccount account){
+        insertAccountSingle(account, false);
+        account.addedIdentities().forEach((i)-> this.insertIdentity(i, false));
+        account.addedFactors().forEach((f) -> this.insertFactor(f, false));
     }
     /** 顺序：因子删/改 → 身份删 → 身份改 → 身份增 → 因子增（因子引用的身份先于因子存在） */
-    private void writeRows(LoginAccount account) {
+    private void writeAccount(LoginAccount account) {
+        saveAccountSingle(account);
         account.removedFactors().forEach(this::deleteFactor);
         account.dirtyFactors().forEach(this::updateFactor);
         account.removedIdentities().forEach(this::deleteIdentity);
         account.dirtyIdentities().forEach(this::updateIdentity);
-        account.addedIdentities().forEach(i -> {
-            UserIdentityPO po = UserIdentityPOConverter.toPO(i);
-            try {
-                identityMapper.insert(po);
-            } catch (DuplicateKeyException e){
-                if (identityMapper.selectById(po.getId()) == null){
-                    // 如果不能查出来，说明被其它人抢占，一般不会到达
-                    throw new IdentifierAlreadyTakenException(i.getIdentifier());
-                }
-                // 能查到，视为幂等
-            }
-
-        });
-        account.addedFactors().forEach(f -> {
-            UserMfaFactorPO po = MfaFactorPOConverter.toPO(f);
-            try {
-                factorMapper.insert(po);
-            } catch (DuplicateKeyException e){
-                if (identityMapper.selectById(po.getId()) == null){
-                    // 如果不能查出来，说明被其它人抢占，一般不会到达
-                    throw new MfaFactorAlreadyExistException(f);
-                }
-                // 能查到，视为幂等
-            }
-
-        });
+        account.addedIdentities().forEach(i -> insertIdentity(i, true));
+        account.addedFactors().forEach(f -> insertFactor(f, true));
     }
 
-    private void insertIdentity(UserIdentity userIdentity){
+
+    private void saveAccountSingle(LoginAccount account){
+        if (account.isNew()){
+            insertAccountSingle(account, true);
+        } else {
+            updateAccountSingle(account);
+        }
+    }
+
+    private void updateAccountSingle(LoginAccount account){
+        LoginAccountPO po = LoginAccountPOConverter.toPO(account);
+        if (loginAccountMapper.updateByUserId(po) == 0){
+            throw new AccountStatusChangedException(account.getUserId());
+        }
+    }
+
+    private void insertAccountSingle(LoginAccount account,  boolean isIdempotent){
+        LoginAccountPO po = LoginAccountPOConverter.toPO(account);
+        try {
+            loginAccountMapper.insert(po);
+        } catch (DuplicateKeyException e){
+            if (!isIdempotent){
+                throw new AccountAlreadyExistException(account.getUserId());
+            }
+        }
+    }
+
+    private void insertIdentity(UserIdentity userIdentity, boolean isIdempotent){
         UserIdentityPO po = UserIdentityPOConverter.toPO(userIdentity);
         try {
             identityMapper.insert(po);
         } catch (DuplicateKeyException e){
-            throw new IdentifierAlreadyTakenException(userIdentity.getIdentifier());
+            if (isIdempotent){
+                if (identityMapper.selectById(po.getId()) == null){
+                    // 如果不能查出来，说明被其它人抢占，一般不会到达
+                    throw new IdentifierAlreadyTakenException(userIdentity.getIdentifier());
+                }
+            } else {
+                throw new IdentifierAlreadyTakenException(userIdentity.getIdentifier());
+            }
         }
     }
-
-    private void insertFactor(UserMfaFactor factor){
-        UserMfaFactorPO po = MfaFactorPOConverter.toPO(factor);
+    private void insertFactor(UserMfaFactor factor, boolean isIdempotent){
+        UserMfaFactorPO po = UserMfaFactorPOConverter.toPO(factor);
         try {
             factorMapper.insert(po);
         } catch (DuplicateKeyException e){
-            throw new MfaFactorAlreadyExistException(factor);
+            if (isIdempotent){
+                if (identityMapper.selectById(po.getId()) == null){
+                    // 如果不能查出来，说明被其它人抢占，一般不会到达
+                    throw new MfaFactorAlreadyExistException(factor);
+                }
+            } else {
+                throw new MfaFactorAlreadyExistException(factor);
+            }
         }
     }
 
@@ -218,7 +241,7 @@ public class LoginAccountRepositoryImpl implements LoginAccountRepository {
     }
 
     private void updateFactor(UserMfaFactor factor) {
-        UserMfaFactorPO po = MfaFactorPOConverter.toPO(factor);
+        UserMfaFactorPO po = UserMfaFactorPOConverter.toPO(factor);
         factorMapper.update(null, Wrappers.<UserMfaFactorPO>lambdaUpdate()
                 .set(UserMfaFactorPO::getStatus, po.getStatus())
                 .set(UserMfaFactorPO::getVerifiedAt, po.getVerifiedAt())

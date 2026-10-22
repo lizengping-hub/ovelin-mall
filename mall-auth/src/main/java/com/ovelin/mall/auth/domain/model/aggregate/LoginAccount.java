@@ -32,14 +32,20 @@ public class LoginAccount {
 
     @Getter
     private final ShardedId userId;
+    @Getter
+    private long version;
+    @Getter
+    private boolean isNew;
     private final List<UserIdentity> identities = new ArrayList<>();
     private final List<UserMfaFactor> factors = new ArrayList<>();
 
     private final ChangeSet<UserIdentity> identityChanges = new ChangeSet<>();
     private final ChangeSet<UserMfaFactor> factorChanges = new ChangeSet<>();
 
-    private LoginAccount(ShardedId userId) {
+    private LoginAccount(ShardedId userId, long version, boolean isNew) {
         this.userId = userId;
+        this.version = version;
+        this.isNew = isNew;
     }
 
     // ------------------------------------------------------------------ 创建 / 还原
@@ -47,21 +53,27 @@ public class LoginAccount {
     /** 注册：创建账号并带上首个登录身份 */
     public static LoginAccount open(ShardedId userId, ShardedId identityId,
                                     IdentityIdentifier identityIdentifier) {
-        LoginAccount account = new LoginAccount(userId);
+        LoginAccount account = new LoginAccount(userId, 0, true);
         account.bindIdentity(identityId, identityIdentifier);
         return account;
     }
 
 
     /** 仅供持久化层还原：不校验、不产生变更记录 */
-    public static LoginAccount reconstitute(ShardedId userId, List<UserIdentity> identities,
+    public static LoginAccount reconstitute(ShardedId userId, long version, List<UserIdentity> identities,
                                             List<UserMfaFactor> factors) {
-        LoginAccount account = new LoginAccount(userId);
+        LoginAccount account = new LoginAccount(userId, version, false);
         account.identities.addAll(identities);
         account.factors.addAll(factors);
         return account;
     }
 
+    public void unNew(){
+        this.isNew = false;
+    }
+    public void increaseVersion(){
+        version ++;
+    }
     // ------------------------------------------------------------------ 身份
 
     /** 新增登录身份（未验证） */

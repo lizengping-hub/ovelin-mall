@@ -15,9 +15,11 @@ import com.ovelin.mall.auth.domain.model.identityIdentifier.PhoneIdentifier;
 import com.ovelin.mall.auth.infrastructure.persistence.AuthIntegrationTestSupport;
 import com.ovelin.mall.auth.infrastructure.persistence.gateway.IdentityLookupGateway;
 import com.ovelin.mall.auth.infrastructure.persistence.mapper.IdentityLookupMapper;
+import com.ovelin.mall.auth.infrastructure.persistence.mapper.LoginAccountMapper;
 import com.ovelin.mall.auth.infrastructure.persistence.mapper.UserIdentityMapper;
 import com.ovelin.mall.auth.infrastructure.persistence.mapper.UserMfaFactorMapper;
 import com.ovelin.mall.auth.infrastructure.persistence.po.IdentityLookupPO;
+import com.ovelin.mall.auth.infrastructure.persistence.po.LoginAccountPO;
 import com.ovelin.mall.auth.infrastructure.persistence.po.UserIdentityPO;
 import com.ovelin.mall.auth.infrastructure.persistence.po.UserMfaFactorPO;
 import com.ovelin.mall.common.sharding.core.ov.ShardedId;
@@ -69,6 +71,8 @@ class LoginAccountRepositoryImplIT extends AuthIntegrationTestSupport {
             EmailIdentifier.from("test@example.com");
     @Autowired
     AuthIdFactory authIdFactory;
+    @MockitoSpyBean
+    private LoginAccountMapper loginAccountMapper;
     @MockitoSpyBean
     private IdentityLookupMapper identityLookupMapper;
     @MockitoSpyBean
@@ -126,6 +130,9 @@ class LoginAccountRepositoryImplIT extends AuthIntegrationTestSupport {
         @DisplayName("能够 还原Identities")
         void findByUserId_getLoginAccountOfIdentities(){
             ShardedId userId = newId("user");
+
+            LoginAccountPO accountPO = newLoginAccountPO(userId);
+            loginAccountMapper.insert(accountPO);
             UserIdentityPO ui = newUserIdentityPO(userId);
             identityMapper.insert(ui);
 
@@ -154,6 +161,9 @@ class LoginAccountRepositoryImplIT extends AuthIntegrationTestSupport {
         @DisplayName("能够 还原Factors")
         void findByUserId_getLoginAccountOfMfaFactors(){
             ShardedId userId = newId("user");
+            LoginAccountPO accountPO = newLoginAccountPO(userId);
+            loginAccountMapper.insert(accountPO);
+
             UserIdentityPO ui = newUserIdentityPO(userId);
             identityMapper.insert(ui);
 
@@ -171,6 +181,7 @@ class LoginAccountRepositoryImplIT extends AuthIntegrationTestSupport {
 
     }
 
+
     @Nested
     @DisplayName("2. Add 新增")
     class Add{
@@ -178,7 +189,7 @@ class LoginAccountRepositoryImplIT extends AuthIntegrationTestSupport {
         @DisplayName("新增账号和查询")
         void addAndQuery(){
             LoginAccount account = newPhoneIdentityLoginAccount(false);
-            repository.add(account);
+            repository.save(account);
             assertThat(account.hasChanges()).isFalse();
             assertThat(repository.findUserIdByIdentity(PHONE)).contains(account.getUserId());
             loadAndAssertLoginAccount(account);
@@ -187,14 +198,14 @@ class LoginAccountRepositoryImplIT extends AuthIntegrationTestSupport {
         @DisplayName("新增账号和会清空变化记录")
         void addAndClearChanges(){
             LoginAccount account = newPhoneIdentityLoginAccount(false);
-            repository.add(account);
+            repository.save(account);
             assertThat(account.hasChanges()).isFalse();
         }
         @Test
         @DisplayName("新增开启二次认证账号和查询")
         void addIncludeFactorAndQuery(){
             LoginAccount account = newPhoneIdentityLoginAccount(true);
-            repository.add(account);
+            repository.save(account);
             assertThat(repository.findUserIdByIdentity(PHONE)).contains(account.getUserId());
             loadAndAssertLoginAccount(account);
         }
@@ -204,7 +215,7 @@ class LoginAccountRepositoryImplIT extends AuthIntegrationTestSupport {
         void addSingleIdentityUsesFastPath() {
             LoginAccount account = newPhoneIdentityLoginAccount(false);
 
-            repository.add(account);
+            repository.save(account);
 
             verify(lookupGateway).insertConfirmed(any(), any());
             verify(lookupGateway, never()).reserve(any(), any());
@@ -218,7 +229,7 @@ class LoginAccountRepositoryImplIT extends AuthIntegrationTestSupport {
             LoginAccount account = LoginAccount.open(userId, authIdFactory.newIdentityId(userId), PHONE);
             account.bindIdentity(authIdFactory.newIdentityId(userId), EMAIL);
 
-            repository.add(account);
+            repository.save(account);
 
             verify(lookupGateway, times(2)).reserve(any(), any());
             verify(lookupGateway, never()).insertConfirmed(any(), any());
@@ -237,7 +248,7 @@ class LoginAccountRepositoryImplIT extends AuthIntegrationTestSupport {
 
             LoginAccount account = newPhoneIdentityLoginAccount();
 
-            assertThatThrownBy(() -> repository.add(account))
+            assertThatThrownBy(() -> repository.save(account))
                     .isInstanceOf(IdentifierAlreadyTakenException.class);
 
             // 整个事务回滚，账号不应落库
@@ -253,7 +264,7 @@ class LoginAccountRepositoryImplIT extends AuthIntegrationTestSupport {
 
             LoginAccount account = newPhoneIdentityLoginAccount();
 
-            assertThatThrownBy(() -> repository.add(account))
+            assertThatThrownBy(() -> repository.save(account))
                     .isInstanceOf(IdentifierAlreadyTakenException.class);
 
             // 整个事务回滚，包括 lookup 已写入的部分
@@ -270,7 +281,7 @@ class LoginAccountRepositoryImplIT extends AuthIntegrationTestSupport {
             // 在 lookup 写入处注入故障，模拟基础设施异常（真实环境无法稳定复现）
             doThrow(timeout).when(identityLookupMapper).insert(any(IdentityLookupPO.class));
 
-            assertThatThrownBy(() -> repository.add(account))
+            assertThatThrownBy(() -> repository.save(account))
                     .isNotInstanceOf(IdentifierAlreadyTakenException.class)
                     .isSameAs(timeout);
 
@@ -295,7 +306,7 @@ class LoginAccountRepositoryImplIT extends AuthIntegrationTestSupport {
             UserMfaFactor factor = loaded.addIdentityFactor(authIdFactory.newFactorId(userId), emailId);
             loaded.enableFactor(factor.getId(), now());
             loaded.addSecretFactor(authIdFactory.newFactorId(userId), MfaFactorType.TOTP, "encrypted-secret");
-            repository.update(loaded);
+            repository.save(loaded);
 
             assertThat(loaded.hasChanges()).isFalse();
             assertThat(repository.findUserIdByIdentity(PHONE)).contains(userId);
@@ -324,7 +335,7 @@ class LoginAccountRepositoryImplIT extends AuthIntegrationTestSupport {
             loaded.recordLogin(phoneId, base.plusSeconds(2));
             loaded.enableFactor(factorId, base.plusSeconds(3));
             loaded.recordFactorUsed(factorId, base.plusSeconds(4));
-            repository.update(loaded);
+            repository.save(loaded);
 
             loadAndAssertLoginAccount(loaded);
         }
@@ -344,7 +355,7 @@ class LoginAccountRepositoryImplIT extends AuthIntegrationTestSupport {
                     .filter(i -> i.type().equals(PHONE.type())).findFirst().orElseThrow().getId();
             loaded.unbindIdentity(phoneId);
             loaded.removeFactor(factorId);
-            repository.update(loaded);
+            repository.save(loaded);
 
             // 直接查表，不经过 findByUserId（它在没有身份行时不看因子，会掩盖因子行没删的问题）
             assertThat(identityMapper.selectByUserId(userId.value())).hasSize(1);
@@ -365,7 +376,7 @@ class LoginAccountRepositoryImplIT extends AuthIntegrationTestSupport {
 
             LoginAccount loaded = load(userId);
             loaded.close();
-            repository.update(loaded);
+            repository.save(loaded);
 
             assertThat(identityMapper.selectByUserId(userId.value())).isEmpty();
             assertThat(factorMapper.selectByUserId(userId.value())).isEmpty();
@@ -381,7 +392,7 @@ class LoginAccountRepositoryImplIT extends AuthIntegrationTestSupport {
             assertThat(loaded.hasChanges()).isFalse();
             clearInvocations(identityMapper, factorMapper, identityLookupMapper);
 
-            repository.update(loaded);
+            repository.save(loaded);
 
             verifyNoInteractions(identityMapper, factorMapper, identityLookupMapper);
         }
@@ -402,7 +413,7 @@ class LoginAccountRepositoryImplIT extends AuthIntegrationTestSupport {
             // update 走 lookup.reserve，冲突时会查出原因（为了幂等），所以抛的是细化后的异常：
             // 被他人持有 → IdentifierNotOwnedByUserException（IdentifierAlreadyTakenException 的子类）。
             // add 单身份走 insertConfirmed，唯一键冲突直接抛 IdentifierAlreadyTakenException，不查原因。
-            assertThatThrownBy(() -> repository.update(b))
+            assertThatThrownBy(() -> repository.save(b))
                     .isInstanceOf(IdentifierNotOwnedByUserException.class);
 
             // 失败不能误释放 A 的占位，也不能污染 B
@@ -422,7 +433,7 @@ class LoginAccountRepositoryImplIT extends AuthIntegrationTestSupport {
 
             LoginAccount loadedA = load(userA);
             loadedA.unbindIdentity(phoneIdA);
-            repository.update(loadedA);
+            repository.save(loadedA);
 
             ShardedId userB = persisted(newPhoneIdentityLoginAccount(false)).getUserId();
             assertThat(repository.findUserIdByIdentity(PHONE)).contains(userB);
@@ -438,7 +449,7 @@ class LoginAccountRepositoryImplIT extends AuthIntegrationTestSupport {
             RuntimeException timeout = new QueryTimeoutException("db timeout");
             doThrow(timeout).when(identityLookupMapper).insertOrTouch(anyString(), anyString(), anyLong(), anyInt());
 
-            assertThatThrownBy(() -> repository.update(updateAccount)).isSameAs(timeout);
+            assertThatThrownBy(() -> repository.save(updateAccount)).isSameAs(timeout);
 
             assertThat(updateAccount.hasChanges()).isTrue();
             assertThat(identityMapper.selectByUserId(userId.value())).hasSize(1);
@@ -455,7 +466,7 @@ class LoginAccountRepositoryImplIT extends AuthIntegrationTestSupport {
             doThrow(timeout).when(identityMapper).insert(any(UserIdentityPO.class));
             clearInvocations(lookupGateway,identityMapper);
 
-            assertThatThrownBy(()->repository.update(updateAccount)).isInstanceOf(QueryTimeoutException.class);
+            assertThatThrownBy(()->repository.save(updateAccount)).isInstanceOf(QueryTimeoutException.class);
             assertThat(updateAccount.hasChanges()).isTrue();
             assertThat(updateAccount.addedIdentities()).isNotEmpty();
 
@@ -466,7 +477,7 @@ class LoginAccountRepositoryImplIT extends AuthIntegrationTestSupport {
 
             // 重试
             reset(identityMapper);
-            repository.update(updateAccount);
+            repository.save(updateAccount);
             assertThat(updateAccount.hasChanges()).isFalse();
             assertThat(repository.findUserIdByIdentity(EMAIL)).contains(userId);
             loadAndAssertLoginAccount(updateAccount);
@@ -482,7 +493,7 @@ class LoginAccountRepositoryImplIT extends AuthIntegrationTestSupport {
             doThrow(new QueryTimeoutException("db timeout"))
                     .when(lookupGateway).confirm(EMAIL, userId);
 
-            assertThatCode(() -> repository.update(account)).doesNotThrowAnyException();
+            assertThatCode(() -> repository.save(account)).doesNotThrowAnyException();
 
             assertThat(account.hasChanges()).isFalse();
             assertThat(repository.findUserIdByIdentity(EMAIL)).isEmpty();           // RESERVED 查不到
@@ -505,13 +516,13 @@ class LoginAccountRepositoryImplIT extends AuthIntegrationTestSupport {
             doThrow(new QueryTimeoutException("db timeout"))
                     .when(identityMapper).delete(any(Wrapper.class));   // com.baomidou.mybatisplus.core.conditions.Wrapper
 
-            assertThatThrownBy(() -> repository.update(loaded)).isInstanceOf(QueryTimeoutException.class);
+            assertThatThrownBy(() -> repository.save(loaded)).isInstanceOf(QueryTimeoutException.class);
             assertThat(loaded.hasChanges()).isTrue();
             assertThat(identityMapper.selectByUserId(userId.value())).hasSize(2);
             assertThat(repository.findUserIdByIdentity(PHONE)).contains(userId);   // abortRelease 已恢复
 
             reset(identityMapper);
-            repository.update(loaded);   // 重试
+            repository.save(loaded);   // 重试
 
             assertThat(loaded.hasChanges()).isFalse();
             assertThat(repository.findUserIdByIdentity(PHONE)).isEmpty();
@@ -532,7 +543,7 @@ class LoginAccountRepositoryImplIT extends AuthIntegrationTestSupport {
             doThrow(new QueryTimeoutException("db timeout"))
                     .when(lookupGateway).completeRelease(PHONE, userId);
 
-            assertThatCode(() -> repository.update(loaded)).doesNotThrowAnyException();
+            assertThatCode(() -> repository.save(loaded)).doesNotThrowAnyException();
 
             assertThat(loaded.hasChanges()).isFalse();
             assertThat(repository.findUserIdByIdentity(PHONE)).isEmpty();
@@ -556,8 +567,8 @@ class LoginAccountRepositoryImplIT extends AuthIntegrationTestSupport {
         CyclicBarrier barrier = new CyclicBarrier(2);
         ExecutorService pool = Executors.newFixedThreadPool(2);
         List<Future<?>> futures = List.of(
-                pool.submit(() -> { barrier.await(); repository.update(a); return null; }),
-                pool.submit(() -> { barrier.await(); repository.update(b); return null; }));
+                pool.submit(() -> { barrier.await(); repository.save(a); return null; }),
+                pool.submit(() -> { barrier.await(); repository.save(b); return null; }));
 
         int success = 0;
         for (Future<?> f : futures) {
@@ -594,13 +605,14 @@ class LoginAccountRepositoryImplIT extends AuthIntegrationTestSupport {
 
     /** 走生产路径（add）把账号落库，作为 Update 用例的初始状态 */
     private LoginAccount persisted(LoginAccount account) {
-        repository.add(account);
+        repository.save(account);
         return account;
     }
 
     private LoginAccount load(ShardedId userId) {
         return repository.findByUserId(userId).orElseThrow();
     }
+
 
     private IdentityLookupPO newIdentityLookupPO(){
         IdentityLookupPO po = new IdentityLookupPO();
@@ -609,6 +621,13 @@ class LoginAccountRepositoryImplIT extends AuthIntegrationTestSupport {
         po.setIdentifier(PHONE.value());
         return po;
     }
+
+    private LoginAccountPO newLoginAccountPO(ShardedId userId) {
+        LoginAccountPO accountPO = new LoginAccountPO();
+        accountPO.setUserId(userId.value());
+        return accountPO;
+    }
+
     private UserIdentityPO newUserIdentityPO(ShardedId userId){
         UserIdentityPO ui = new UserIdentityPO();
         ui.setUserId(userId.value());

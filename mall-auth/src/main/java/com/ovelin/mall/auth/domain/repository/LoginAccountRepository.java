@@ -23,12 +23,8 @@ public interface LoginAccountRepository {
      *
      * @throws com.ovelin.mall.auth.domain.exception.IdentifierAlreadyTakenException 新增的登录标识已被占用
      */
-    void update(LoginAccount account);
+    void save(LoginAccount account);
 
-    /**
-     * LogingAccount是新增时使用，新增聚合，与后续update分离可以减少一些复杂且不易实现的逻辑判断
-     *
-     */
-    void add(LoginAccount account);
+
 
 }
