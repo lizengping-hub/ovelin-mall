@@ -320,7 +320,6 @@ class LoginAccountRepositoryImplIT extends AuthIntegrationTestSupport {
             LoginAccount loaded = load(userId);
             ShardedId emailId = authIdFactory.newIdentityId(userId);
             loaded.bindIdentity(emailId, EMAIL);
-            loaded.verifyIdentity(emailId, now());
             UserMfaFactor factor = loaded.addIdentityFactor(authIdFactory.newFactorId(userId), emailId);
             loaded.enableFactor(factor.getId(), now());
             loaded.addSecretFactor(authIdFactory.newFactorId(userId), MfaFactorType.TOTP, "encrypted-secret");
@@ -338,10 +337,10 @@ class LoginAccountRepositoryImplIT extends AuthIntegrationTestSupport {
         /**
          * updateIdentity / updateFactor 是显式 set 的，漏写一列只有这里能发现。
          * 所以每个可变列都要改成和初始值（null / PENDING）不同的值，且各列用不同时间，避免串列。
-         * 可变列：identity.verifiedAt / lastLoginAt；factor.status / verifiedAt / lastUsedAt。
+         * 可变列：identity.lastLoginAt；factor.status / verifiedAt / lastUsedAt。
          */
         @Test
-        @DisplayName("修改所有可变列：身份 verifiedAt/lastLoginAt，因子 status/verifiedAt/lastUsedAt 都被写回")
+        @DisplayName("修改所有可变列：身份 lastLoginAt，因子 status/verifiedAt/lastUsedAt 都被写回")
         void update_allMutableColumns() {
             ShardedId userId = authIdFactory.newUserId(PHONE);
             ShardedId phoneId = authIdFactory.newIdentityId(userId);
@@ -352,8 +351,7 @@ class LoginAccountRepositoryImplIT extends AuthIntegrationTestSupport {
 
             Instant base = now();
             LoginAccount loaded = load(userId);
-            loaded.verifyIdentity(phoneId, base.plusSeconds(1));
-            loaded.recordLogin(phoneId, base.plusSeconds(2));
+            loaded.recordLogin(phoneId, base.plusSeconds(1));
             loaded.enableFactor(factorId, base.plusSeconds(3));
             loaded.recordFactorUsed(factorId, base.plusSeconds(4));
             repository.save(loaded);
@@ -659,7 +657,6 @@ class LoginAccountRepositoryImplIT extends AuthIntegrationTestSupport {
 
         LoginAccount account = LoginAccount.open(userId, identityId, PHONE);
         if (addFactor){
-            account.verifyIdentity(identityId,  now());
             ShardedId factorId = authIdFactory.newFactorId(userId);
             account.addIdentityFactor(factorId, identityId);
         }
@@ -735,7 +732,6 @@ class LoginAccountRepositoryImplIT extends AuthIntegrationTestSupport {
             assertThat(laIdentity.getId()).isEqualTo(identity.getId());
             assertThat(laIdentity.type()).isEqualTo(identity.type());
             assertThat(laIdentity.getIdentifier()).isEqualTo(identity.getIdentifier());
-            assertThat(laIdentity.getVerifiedAt()).isEqualTo(identity.getVerifiedAt());
             assertThat(laIdentity.getLastLoginAt()).isEqualTo(identity.getLastLoginAt());
         }
 

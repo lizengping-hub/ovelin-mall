@@ -21,15 +21,12 @@ public class UserIdentity {
     private final ShardedId id;
     private final ShardedId userId;
     private final IdentityIdentifier identifier;
-    private Instant verifiedAt;
     private Instant lastLoginAt;
 
-    private UserIdentity(ShardedId id, ShardedId userId, IdentityIdentifier identifier,
-                         Instant verifiedAt, Instant lastLoginAt) {
+    private UserIdentity(ShardedId id, ShardedId userId, IdentityIdentifier identifier, Instant lastLoginAt) {
         this.id = id;
         this.userId = userId;
         this.identifier = identifier;
-        this.verifiedAt = verifiedAt;
         this.lastLoginAt = lastLoginAt;
     }
 
@@ -46,23 +43,13 @@ public class UserIdentity {
             throw new InvalidArgumentException("身份记录必须与用户落在同一分片");
         }
 
-        return new UserIdentity(id, userId, identityIdentifier, null, null);
+        return new UserIdentity(id, userId, identityIdentifier, null);
     }
 
     /** 仅供持久化层还原，不做标准化和校验 */
     public static UserIdentity reconstitute(ShardedId id, ShardedId userId, String type,
-                                            String identifier,
-                                            Instant verifiedAt, Instant lastLoginAt) {
-        return new UserIdentity(id, userId, IdentityIdentifierFactory.reconstitute(type, identifier), verifiedAt, lastLoginAt);
-    }
-
-    /** @return 是否发生变化（已验证过则不变） */
-    boolean markVerified(Instant at) {
-        if (verifiedAt != null) {
-            return false;
-        }
-        verifiedAt = at;
-        return true;
+                                            String identifier, Instant lastLoginAt) {
+        return new UserIdentity(id, userId, IdentityIdentifierFactory.reconstitute(type, identifier), lastLoginAt);
     }
 
     void recordLogin(Instant at) {
@@ -71,14 +58,6 @@ public class UserIdentity {
 
     boolean matches(IdentityIdentifier identityIdentifier) {
         return this.identifier.equals(identityIdentifier);
-    }
-
-    public boolean isVerified() {
-        return verifiedAt != null;
-    }
-
-    public boolean canToMfa() {
-        return identifier.type().supportsMfa() && isVerified();
     }
 
     public String value(){

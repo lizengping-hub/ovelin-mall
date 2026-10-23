@@ -24,7 +24,6 @@ class UserIdentityMapperIT extends AuthIntegrationTestSupport {
     void insertAndQueryByUserIdWithCompleteFields() {
         ShardedId userId = newId("user", 0);
         UserIdentityPO po = identity(newId("user_identity", 0), userId, "phone", "13800000000");
-        po.setVerifiedAt(now());
 
         mapper.insert(po);
 
@@ -35,7 +34,6 @@ class UserIdentityMapperIT extends AuthIntegrationTestSupport {
         assertThat(actual.getUserId()).isEqualTo(userId.value());
         assertThat(actual.getIdentityType()).isEqualTo("phone");
         assertThat(actual.getIdentifier()).isEqualTo("13800000000");
-        assertThat(actual.getVerifiedAt()).isEqualTo(po.getVerifiedAt());
         assertThat(actual.getLastLoginAt()).isNull();
     }
 
@@ -69,15 +67,15 @@ class UserIdentityMapperIT extends AuthIntegrationTestSupport {
     void updateCanSetFieldToNull() {
         ShardedId userId = newId("user", 0);
         UserIdentityPO po = identity(newId("user_identity", 0), userId, "phone", "13800000003");
-        po.setVerifiedAt(now());
+        po.setLastLoginAt(now());
         mapper.insert(po);
 
         mapper.update(null, Wrappers.<UserIdentityPO>lambdaUpdate()
-                .set(UserIdentityPO::getVerifiedAt, null)
+                .set(UserIdentityPO::getLastLoginAt, null)
                 .eq(UserIdentityPO::getId, po.getId())
                 .eq(UserIdentityPO::getUserId, userId.value()));
 
-        assertThat(mapper.selectByUserId(userId.value()).get(0).getVerifiedAt()).isNull();
+        assertThat(mapper.selectByUserId(userId.value()).get(0).getLastLoginAt()).isNull();
     }
 
     @Test

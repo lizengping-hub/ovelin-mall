@@ -20,8 +20,6 @@ public class UserIdentityPO {
 
     private String identifier;
 
-    private Instant verifiedAt;
-
     private Instant lastLoginAt;
 
     @TableField(insertStrategy = FieldStrategy.NEVER, updateStrategy = FieldStrategy.NEVER)

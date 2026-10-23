@@ -22,7 +22,7 @@ import java.util.*;
  *   <li>至少保留一个登录身份（close() 注销除外）</li>
  *   <li>同一账号内 (type, identifier) 不重复</li>
  *   <li>解绑身份时，先停用引用该身份的 sms/email 因子，再移除身份</li>
- *   <li>只有已验证的手机号/邮箱才能创建、启用 sms/email 因子</li>
+ *   <li>只有手机号/邮箱身份才能创建、启用 sms/email 因子</li>
  * </ul>
  * 密码（UserPassword）不在本聚合内：它只有自己的规则，且登录失败计数是高频写，单独成聚合避免写冲突。
  * <p>
@@ -98,7 +98,7 @@ public class LoginAccount {
 
     // ------------------------------------------------------------------ 身份
 
-    /** 新增登录身份（未验证） */
+    /** 新增登录身份 */
     public UserIdentity bindIdentity(ShardedId identityId, IdentityIdentifier identityIdentifier) {
         UserIdentity identity = UserIdentity.register(identityId, userId, identityIdentifier);
         if (findIdentity(identityIdentifier).isPresent()) {
@@ -106,13 +106,6 @@ public class LoginAccount {
         }
         addIdentityInternal(identity);
         return identity;
-    }
-
-    public void verifyIdentity(ShardedId identityId, Instant at) {
-        UserIdentity identity = requireIdentity(identityId);
-        if (identity.markVerified(at)) {
-            identityChanges.dirty(identity.getId(), identity);
-        }
     }
 
     public void recordLogin(ShardedId identityId, Instant at) {
@@ -144,7 +137,7 @@ public class LoginAccount {
 
     // ------------------------------------------------------------------ 二次验证因子
 
-    /** 短信/邮箱因子：引用本账号内一个已验证的手机号/邮箱身份 */
+    /** 短信/邮箱因子：引用本账号内一个手机号/邮箱身份 */
     public UserMfaFactor addIdentityFactor(ShardedId factorId, ShardedId identityId) {
         UserIdentity identity = requireIdentity(identityId);
         boolean exists = factors.stream()
@@ -169,11 +162,7 @@ public class LoginAccount {
     public void enableFactor(ShardedId factorId, Instant at) {
         UserMfaFactor factor = requireFactor(factorId);
         if (factor.getIdentityId() != null) {
-            // 引用身份的因子：启用时身份必须仍然存在且已验证
-            UserIdentity identity = requireIdentity(factor.getIdentityId());
-            if (!identity.isVerified()) { // 目前关联身份的因子在开启时要求type符合并且已验证，
-                throw new InvalidStatusException("该身份不能用于二次验证：不支持二次验证或未完成验证");
-            }
+            requireIdentity(factor.getIdentityId());
         }
         if (factor.enable(at)) {
             factorChanges.dirty(factor.getId(), factor);

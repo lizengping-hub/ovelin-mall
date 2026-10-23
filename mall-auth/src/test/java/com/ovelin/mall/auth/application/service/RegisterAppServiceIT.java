@@ -61,12 +61,10 @@ class RegisterAppServiceIT extends AuthIntegrationTestSupport {
     }
 
     @Test
-    void register_email_without_verify_at_leaves_identity_unverified() {
+    void register_email_without_password_creates_identity() {
         registerAppService.register(cmd("email", "bob@example.com", null, null, "WEB", false, null));
 
-        Integer verified = jdbcTemplate.queryForObject(
-                "select count(*) from user_identity where verified_at is not null", Integer.class);
-        assertThat(verified).isZero();
+        assertThat(count("user_identity")).isEqualTo(1);
         assertThat(count("user_password")).isZero();
     }
 
@@ -132,13 +130,11 @@ class RegisterAppServiceIT extends AuthIntegrationTestSupport {
         assertThat(confirmedLookupCount()).isEqualTo(1);
     }
     @Test
-    void register_phone_with_mfa_inserts_factor_row_and_verified_identity() {
+    void register_phone_with_mfa_inserts_identity_and_factor_rows() {
         registerAppService.register(cmd("phone", "13800138000", null, null, "SMS", true, "123456"));
 
         assertThat(count("user_mfa_factor")).isEqualTo(1);
-        Integer verified = jdbcTemplate.queryForObject(
-                "select count(*) from user_identity where verified_at is not null", Integer.class);
-        assertThat(verified).isEqualTo(1);
+        assertThat(count("user_identity")).isEqualTo(1);
     }
 
     @Test

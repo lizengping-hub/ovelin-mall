@@ -20,9 +20,6 @@ class UserIdentityPOConverterTest {
 
     private static final String IDENTIFIER = "user@example.com";
 
-    private static final Instant VERIFIED_AT =
-            Instant.parse("2026-01-01T10:00:00Z");
-
     private static final Instant LAST_LOGIN_AT =
             Instant.parse("2026-01-02T10:00:00Z");
 
@@ -34,7 +31,6 @@ class UserIdentityPOConverterTest {
         po.setUserId(USER_ID.value());
         po.setIdentityType(IdentityType.EMAIL.getCode());
         po.setIdentifier(IDENTIFIER);
-        po.setVerifiedAt(VERIFIED_AT);
         po.setLastLoginAt(LAST_LOGIN_AT);
 
         UserIdentity identity = UserIdentityPOConverter.toDomain(po);
@@ -43,7 +39,6 @@ class UserIdentityPOConverterTest {
         assertThat(identity.getUserId()).isEqualTo(USER_ID);
         assertThat(identity.type()).isEqualTo(IdentityType.EMAIL);
         assertThat(identity.value()).isEqualTo(IDENTIFIER);
-        assertThat(identity.getVerifiedAt()).isEqualTo(VERIFIED_AT);
         assertThat(identity.getLastLoginAt()).isEqualTo(LAST_LOGIN_AT);
     }
 
@@ -55,7 +50,6 @@ class UserIdentityPOConverterTest {
                 USER_ID,
                 IdentityType.EMAIL.getCode(),
                 IDENTIFIER,
-                VERIFIED_AT,
                 LAST_LOGIN_AT
         );
 
@@ -65,7 +59,6 @@ class UserIdentityPOConverterTest {
         assertThat(po.getUserId()).isEqualTo(USER_ID.value());
         assertThat(po.getIdentityType()).isEqualTo(IdentityType.EMAIL.getCode());
         assertThat(po.getIdentifier()).isEqualTo(IDENTIFIER);
-        assertThat(po.getVerifiedAt()).isEqualTo(VERIFIED_AT);
         assertThat(po.getLastLoginAt()).isEqualTo(LAST_LOGIN_AT);
     }
 
@@ -77,7 +70,6 @@ class UserIdentityPOConverterTest {
                 USER_ID,
                 IdentityType.EMAIL.getCode(),
                 IDENTIFIER,
-                VERIFIED_AT,
                 LAST_LOGIN_AT
         );
 
@@ -89,20 +81,18 @@ class UserIdentityPOConverterTest {
     }
 
     @Test
-    @DisplayName("toPO：未验证且从未登录的身份保留 null 时间")
+    @DisplayName("toPO：从未登录的身份保留 null 时间")
     void toPOAllowsNullTimestamps() {
         UserIdentity identity = UserIdentity.reconstitute(
                 ID,
                 USER_ID,
                 IdentityType.EMAIL.getCode(),
                 IDENTIFIER,
-                null,
                 null
         );
 
         UserIdentityPO po = UserIdentityPOConverter.toPO(identity);
 
-        assertThat(po.getVerifiedAt()).isNull();
         assertThat(po.getLastLoginAt()).isNull();
     }
 }

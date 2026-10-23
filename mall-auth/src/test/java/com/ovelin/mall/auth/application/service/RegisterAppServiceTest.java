@@ -9,6 +9,7 @@ import com.ovelin.mall.auth.domain.model.aggregate.UserPassword;
 import com.ovelin.mall.auth.domain.model.enums.IdentityType;
 import com.ovelin.mall.auth.domain.repository.LoginAccountRepository;
 import com.ovelin.mall.auth.domain.repository.UserPasswordRepository;
+import com.ovelin.mall.common.exception.global.InvalidArgumentException;
 import com.ovelin.mall.common.sharding.core.ov.ShardedId;
 import com.ovelin.mall.user.api.UserApi;
 import org.junit.jupiter.api.BeforeEach;
@@ -136,30 +137,10 @@ class RegisterAppServiceTest {
         }
     }
 
-    // ---------- verifyAt ----------
+    // ---------- Verification code ----------
 
     @Nested
-    class Verify {
-
-        @Test
-        void password_identity_is_verified_at_password_changed_time_not_command_time() {
-
-            service.register(cmd("username", "alice", "pw", null, "WEB", false, "12345"));
-
-            LoginAccount saved = captureSavedAccount();
-            ArgumentCaptor<UserPassword> pwd = ArgumentCaptor.forClass(UserPassword.class);
-            verify(userPasswordRepository).add(pwd.capture());
-
-            assertThat(verifiedAtOf(saved)).isEqualTo(pwd.getValue().getPasswordChangedAt());
-        }
-
-        @Test
-        void no_password_uses_command_verify_at() {
-
-            service.register(cmd("phone", "13800138000", null, null, "SMS", false, "12345"));
-
-
-        }
+    class VerificationCode {
 
         @Test
         void no_password_and_no_verify_code_throw_verification_failed_exception() {
@@ -170,23 +151,20 @@ class RegisterAppServiceTest {
         }
 
         @Test
-        void username_password_is_verified_at_password_changed_time() {
+        void username_does_not_use_verification_code() {
             service.register(cmd("username", "alice", "pw", null, "WEB", false, null));
 
-            ArgumentCaptor<UserPassword> pwd = ArgumentCaptor.forClass(UserPassword.class);
-            verify(userPasswordRepository).add(pwd.capture());
-            assertThat(verifiedAtOf(captureSavedAccount())).isEqualTo(pwd.getValue().getPasswordChangedAt());
+            assertThat(captureSavedAccount().getIdentities()).hasSize(1);
             verifyNoInteractions(verificationCodeVerifier);   // 用户名不走验证码
         }
 
         @Test
-        void phone_with_valid_code_is_verified_now() {
+        void phone_with_valid_code_is_registered() {
             when(verificationCodeVerifier.verify(any(), eq("123456"))).thenReturn(true);
-            Instant before = Instant.now();
 
             service.register(cmd("phone", "13800138000", null, null, "SMS", false, "123456"));
 
-            assertThat(verifiedAtOf(captureSavedAccount())).isBetween(before, Instant.now());
+            assertThat(captureSavedAccount().getIdentities()).hasSize(1);
             verify(verificationCodeVerifier).verify(
                     argThat(id -> id.type() == IdentityType.PHONE && id.value().equals("+8613800138000")),
                     eq("123456"));
@@ -209,7 +187,7 @@ class RegisterAppServiceTest {
         @Test
         void username_with_mfa_is_rejected_before_anything_happens() {
             assertThatThrownBy(() -> service.register(cmd("username", "alice", "pw", null, "WEB", true, null)))
-                    .isInstanceOf(IllegalArgumentException.class);
+                    .isInstanceOf(InvalidArgumentException.class);
 
             verifyNoInteractions(authIdFactory, passwordEncoder, verificationCodeVerifier,
                     loginAccountRepository, userPasswordRepository, userApi);
@@ -224,7 +202,7 @@ class RegisterAppServiceTest {
         @Test
         void password_required_but_null_throws_and_persists_nothing() {
             assertThatThrownBy(() -> service.register(cmd("username", "alice", null, null, "WEB", false, null)))
-                    .isInstanceOf(NullPointerException.class)
+                    .isInstanceOf(InvalidArgumentException.class)
                     .hasMessage("密码不能为空");
 
             verifyNoInteractions(loginAccountRepository, userPasswordRepository, userApi);
@@ -289,11 +267,6 @@ class RegisterAppServiceTest {
         ArgumentCaptor<LoginAccount> captor = ArgumentCaptor.forClass(LoginAccount.class);
         verify(loginAccountRepository).save(captor.capture());
         return captor.getValue();
-    }
-
-    private Instant verifiedAtOf(LoginAccount account) {
-        // 按实际 API 调整，例如 account.findIdentity(identityId).getVerifiedAt()
-        return account.getIdentities().getFirst().getVerifiedAt();
     }
 
 }

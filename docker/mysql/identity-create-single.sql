@@ -7,7 +7,6 @@ CREATE TABLE user_identity (
        normalized_identifier VARCHAR(255) NOT NULL COMMENT '标准化登录标识',
 
        is_primary TINYINT NOT NULL DEFAULT 0,
-       verified_at DATETIME NULL,
        last_login_at DATETIME NULL,
 
        created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,

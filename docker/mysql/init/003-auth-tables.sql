@@ -47,7 +47,6 @@ BEGIN
                 'user_id BIGINT NOT NULL COMMENT ''用户ID'',',
                 'identity_type VARCHAR(20) NOT NULL COMMENT ''username / phone / email'',',
                 'identifier VARCHAR(255) NOT NULL COMMENT ''标准化登录标识'',',
-                'verified_at TIMESTAMP(3) NULL,',
                 'last_login_at TIMESTAMP(3) NULL,',
                 'created_at TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),',
                 'updated_at TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3)

@@ -232,7 +232,6 @@ public class LoginAccountRepositoryImpl implements LoginAccountRepository {
     private void updateIdentity(UserIdentity identity) {
         UserIdentityPO po = UserIdentityPOConverter.toPO(identity);
         identityMapper.update(null, Wrappers.<UserIdentityPO>lambdaUpdate()
-                .set(UserIdentityPO::getVerifiedAt, po.getVerifiedAt())
                 .set(UserIdentityPO::getLastLoginAt, po.getLastLoginAt())
                 .eq(UserIdentityPO::getId, po.getId())
                 .eq(UserIdentityPO::getUserId, po.getUserId()));

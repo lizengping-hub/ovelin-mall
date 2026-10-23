@@ -14,7 +14,7 @@ public final class UserIdentityPOConverter {
         return UserIdentity.reconstitute(
                 ShardedId.fromId(po.getId()), ShardedId.fromId(po.getUserId()),
                 po.getIdentityType(), po.getIdentifier(),
-               po.getVerifiedAt(), po.getLastLoginAt());
+                po.getLastLoginAt());
     }
 
     public static UserIdentityPO toPO(UserIdentity identity) {
@@ -23,7 +23,6 @@ public final class UserIdentityPOConverter {
         po.setUserId(identity.getUserId().value());
         po.setIdentityType(identity.type().getCode());
         po.setIdentifier(identity.value());
-        po.setVerifiedAt(identity.getVerifiedAt());
         po.setLastLoginAt(identity.getLastLoginAt());
         return po;
     }

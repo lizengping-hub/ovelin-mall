@@ -44,11 +44,10 @@ class LoginAccountTest {
         return account;
     }
 
-    /** 在 persisted() 基础上再绑定一个已验证的手机号，并清空变更集 */
-    private static LoginAccount persistedWithVerifiedPhone() {
+    /** 在 persisted() 基础上再绑定一个手机号，并清空变更集 */
+    private static LoginAccount persistedWithPhone() {
         LoginAccount account = persisted();
         account.bindIdentity(PHONE_ID, PHONE_IDENTITY_IDENTIFIER);
-        account.verifyIdentity(PHONE_ID, NOW);
         account.makeSaved();
         return account;
     }
@@ -86,12 +85,11 @@ class LoginAccountTest {
     class BindIdentity {
 
         @Test
-        void addsUnverifiedIdentityAndRecordsAddedChange() {
+        void addsIdentityAndRecordsAddedChange() {
             LoginAccount account = persisted();
 
             UserIdentity phone = account.bindIdentity(PHONE_ID,PHONE_IDENTITY_IDENTIFIER);
 
-            assertThat(phone.isVerified()).isFalse();
             assertThat(account.getIdentities()).hasSize(2);
             assertThat(account.addedIdentities()).extracting(UserIdentity::getId).containsExactly(PHONE_ID);
 
@@ -103,7 +101,7 @@ class LoginAccountTest {
 
         @Test
         void rejectsDuplicateTypeAndIdentifier() {
-            LoginAccount account = persistedWithVerifiedPhone();
+            LoginAccount account = persistedWithPhone();
 
             assertThatThrownBy(() -> account.bindIdentity(EMAIL_ID, PHONE_IDENTITY_IDENTIFIER))
                     .isInstanceOf(IdentifierAlreadyBoundException.class);
@@ -119,32 +117,7 @@ class LoginAccountTest {
     }
 
     @Nested
-    class VerifyAndLogin {
-
-        @Test
-        void verifyMarksIdentityDirtyOnlyOnce() {
-            LoginAccount account = persisted();
-            account.bindIdentity(PHONE_ID, PHONE_IDENTITY_IDENTIFIER);
-            account.makeSaved();
-
-            account.verifyIdentity(PHONE_ID, NOW);
-            assertThat(account.dirtyIdentities()).extracting(UserIdentity::getId).containsExactly(PHONE_ID);
-
-            account.makeSaved();
-            account.verifyIdentity(PHONE_ID, NOW.plusSeconds(60));
-            assertThat(account.hasChanges()).isFalse();
-        }
-
-        @Test
-        void changesOnNewlyAddedIdentityStayInAddedNotDirty() {
-            LoginAccount account = persisted();
-            account.bindIdentity(PHONE_ID, PHONE_IDENTITY_IDENTIFIER);
-
-            account.verifyIdentity(PHONE_ID, NOW);
-
-            assertThat(account.addedIdentities()).hasSize(1);
-            assertThat(account.dirtyIdentities()).isEmpty();
-        }
+    class IdentityLogin {
 
         @Test
         void recordLoginMarksIdentityDirty() {
@@ -157,10 +130,10 @@ class LoginAccountTest {
         }
 
         @Test
-        void unknownIdentityIsRejected() {
+        void recordLoginRejectsUnknownIdentity() {
             LoginAccount account = persisted();
 
-            assertThatThrownBy(() -> account.verifyIdentity(EMAIL_ID, NOW))
+            assertThatThrownBy(() -> account.recordLogin(EMAIL_ID, NOW))
                     .isInstanceOf(IdentityNotExistException.class);
         }
     }
@@ -179,7 +152,7 @@ class LoginAccountTest {
 
         @Test
         void disablesReferencingFactorsBeforeRemovingIdentity() {
-            LoginAccount account = persistedWithVerifiedPhone();
+            LoginAccount account = persistedWithPhone();
             account.addIdentityFactor(FACTOR_1, PHONE_ID);
             account.enableFactor(FACTOR_1, NOW);
             account.addSecretFactor(FACTOR_2, MfaFactorType.TOTP, "secret");
@@ -207,7 +180,7 @@ class LoginAccountTest {
 
         @Test
         void unknownIdentityIsRejected() {
-            LoginAccount account = persistedWithVerifiedPhone();
+            LoginAccount account = persistedWithPhone();
 
             assertThatThrownBy(() -> account.unbindIdentity(EMAIL_ID))
                     .isInstanceOf(IdentityNotExistException.class);
@@ -218,14 +191,10 @@ class LoginAccountTest {
     class IdentityFactors {
 
         @Test
-        void requiresVerifiedPhoneOrEmail() {
+        void phoneAndEmailCanBeUsedWithoutIdentityVerification() {
             LoginAccount account = persisted();
             account.bindIdentity(PHONE_ID, PHONE_IDENTITY_IDENTIFIER);
 
-            assertThatThrownBy(() -> account.addIdentityFactor(FACTOR_1, PHONE_ID))
-                    .isInstanceOf(InvalidArgumentException.class);
-
-            account.verifyIdentity(PHONE_ID, NOW);
             UserMfaFactor factor = account.addIdentityFactor(FACTOR_1, PHONE_ID);
 
             assertThat(factor.getType()).isEqualTo(MfaFactorType.SMS);
@@ -235,9 +204,8 @@ class LoginAccountTest {
         }
 
         @Test
-        void usernameIdentityCannotBeUsedEvenWhenVerified() {
+        void usernameIdentityCannotBeUsedForIdentityFactor() {
             LoginAccount account = persisted();
-            account.verifyIdentity(USERNAME_ID, NOW);
 
             assertThatThrownBy(() -> account.addIdentityFactor(FACTOR_1, USERNAME_ID))
                     .isInstanceOf(InvalidArgumentException.class);
@@ -245,7 +213,7 @@ class LoginAccountTest {
 
         @Test
         void rejectsSecondActiveFactorOnSameIdentityButAllowsAfterDisable() {
-            LoginAccount account = persistedWithVerifiedPhone();
+            LoginAccount account = persistedWithPhone();
             account.addIdentityFactor(FACTOR_1, PHONE_ID);
 
             assertThatThrownBy(() -> account.addIdentityFactor(FACTOR_2, PHONE_ID))
@@ -257,7 +225,7 @@ class LoginAccountTest {
 
         @Test
         void cannotBeEnabledAfterItsIdentityWasUnbound() {
-            LoginAccount account = persistedWithVerifiedPhone();
+            LoginAccount account = persistedWithPhone();
             account.addIdentityFactor(FACTOR_1, PHONE_ID);
             account.unbindIdentity(PHONE_ID);
 
@@ -378,7 +346,7 @@ class LoginAccountTest {
 
         @Test
         void removesAllFactorsAndIdentities() {
-            LoginAccount account = persistedWithVerifiedPhone();
+            LoginAccount account = persistedWithPhone();
             account.addIdentityFactor(FACTOR_1, PHONE_ID);
             account.addSecretFactor(FACTOR_2, MfaFactorType.TOTP, "s");
             account.makeSaved();
