@@ -9,6 +9,7 @@ import com.ovelin.mall.auth.domain.model.aggregate.LoginAccount;
 import com.ovelin.mall.auth.domain.model.aggregate.UserMfaFactor;
 import com.ovelin.mall.auth.domain.model.aggregate.UserIdentity;
 import com.ovelin.mall.auth.domain.model.enums.IdentityLookupStatus;
+import com.ovelin.mall.auth.domain.model.enums.MfaFactorStatus;
 import com.ovelin.mall.auth.domain.model.enums.MfaFactorType;
 import com.ovelin.mall.auth.domain.model.identityIdentifier.EmailIdentifier;
 import com.ovelin.mall.auth.domain.model.identityIdentifier.IdentityIdentifier;
@@ -131,7 +132,7 @@ class LoginAccountRepositoryImplIT extends AuthIntegrationTestSupport {
         }
 
         @Test
-        @DisplayName("查询不存在的 userId 应返回空")
+        @DisplayName("只有身份行、没有 login_account 行，不会还原")
         void findByUserId_onlyHasIdentity_returnsEmpty() {
             ShardedId userId = newId("user");
             UserIdentityPO ui = newUserIdentityPO(userId);
@@ -220,11 +221,15 @@ class LoginAccountRepositoryImplIT extends AuthIntegrationTestSupport {
             assertThat(account.hasChanges()).isFalse();
         }
         @Test
-        @DisplayName("新增开启二次认证账号和查询")
+        @DisplayName("新增开启二次认证账号和查询：引用身份的因子创建即启用，落库后仍是 ENABLED")
         void addIncludeFactorAndQuery(){
             LoginAccount account = newPhoneIdentityLoginAccount(true);
             repository.save(account);
             assertThat(repository.findUserIdByIdentity(PHONE)).contains(account.getUserId());
+            // 不只依赖和内存对象的逐项比较，显式确认库里的状态
+            assertThat(load(account.getUserId()).getFactors())
+                    .extracting(UserMfaFactor::getStatus)
+                    .containsExactly(MfaFactorStatus.ENABLED);
             loadAndAssertLoginAccount(account);
         }
 
@@ -320,8 +325,8 @@ class LoginAccountRepositoryImplIT extends AuthIntegrationTestSupport {
             LoginAccount loaded = load(userId);
             ShardedId emailId = authIdFactory.newIdentityId(userId);
             loaded.bindIdentity(emailId, EMAIL);
-            UserMfaFactor factor = loaded.addIdentityFactor(authIdFactory.newFactorId(userId), emailId, now());
-            loaded.enableFactor(factor.getId(), now());
+            // 引用身份的因子创建即启用，不需要再 enableFactor
+            loaded.addIdentityFactor(authIdFactory.newFactorId(userId), emailId, now());
             loaded.addSecretFactor(authIdFactory.newFactorId(userId), MfaFactorType.TOTP, "encrypted-secret");
             repository.save(loaded);
 
@@ -338,6 +343,7 @@ class LoginAccountRepositoryImplIT extends AuthIntegrationTestSupport {
          * updateIdentity / updateFactor 是显式 set 的，漏写一列只有这里能发现。
          * 所以每个可变列都要改成和初始值（null / PENDING）不同的值，且各列用不同时间，避免串列。
          * 可变列：identity.lastLoginAt；factor.status / verifiedAt / lastUsedAt。
+         * 这里用密钥类因子（TOTP）：它创建时是 PENDING，才能覆盖 enable 的写回。
          */
         @Test
         @DisplayName("修改所有可变列：身份 lastLoginAt，因子 status/verifiedAt/lastUsedAt 都被写回")
@@ -360,6 +366,27 @@ class LoginAccountRepositoryImplIT extends AuthIntegrationTestSupport {
         }
 
         @Test
+        @DisplayName("停用后重新启用引用身份的因子：status 被写回")
+        void update_disableThenEnableIdentityFactor() {
+            ShardedId userId = persisted(newPhoneIdentityLoginAccount(true)).getUserId();
+
+            LoginAccount loaded = load(userId);
+            ShardedId factorId = loaded.getFactors().getFirst().getId();
+            loaded.disableFactor(factorId);
+            repository.save(loaded);
+            assertThat(load(userId).getFactors()).extracting(UserMfaFactor::getStatus)
+                    .containsExactly(MfaFactorStatus.DISABLED);
+
+            LoginAccount reloaded = load(userId);
+            reloaded.enableFactor(factorId, now());
+            repository.save(reloaded);
+
+            assertThat(load(userId).getFactors()).extracting(UserMfaFactor::getStatus)
+                    .containsExactly(MfaFactorStatus.ENABLED);
+            loadAndAssertLoginAccount(reloaded);
+        }
+
+        @Test
         @DisplayName("删除身份和因子：对应行被删除，被删标识从 lookup 释放，保留的标识仍可查")
         void update_removeIdentityAndFactor() {
             ShardedId userId = authIdFactory.newUserId(PHONE);
@@ -379,6 +406,32 @@ class LoginAccountRepositoryImplIT extends AuthIntegrationTestSupport {
             // 直接查表，不经过 findByUserId（它在没有身份行时不看因子，会掩盖因子行没删的问题）
             assertThat(identityMapper.selectByUserId(userId.value())).hasSize(1);
             assertThat(factorMapper.selectByUserId(userId.value())).isEmpty();
+            assertThat(repository.findUserIdByIdentity(PHONE)).isEmpty();
+            assertThat(repository.findUserIdByIdentity(EMAIL)).contains(userId);
+            loadAndAssertLoginAccount(loaded);
+        }
+
+        /**
+         * 聚合在 unbindIdentity 时会连带移除引用该身份的因子，仓储落库必须保证
+         * 因子行先于身份行删除（身份行被引用时不能先删），并且不依赖调用方再显式 removeFactor。
+         */
+        @Test
+        @DisplayName("解绑被引用身份：引用它的因子连带删除，两类行都被删除，标识从 lookup 释放")
+        void update_unbindIdentityRemovesItsIdentityFactor() {
+            ShardedId userId = authIdFactory.newUserId(PHONE);
+            ShardedId phoneId = authIdFactory.newIdentityId(userId);
+            LoginAccount account = LoginAccount.open(userId, phoneId, PHONE);
+            account.bindIdentity(authIdFactory.newIdentityId(userId), EMAIL);
+            account.addIdentityFactor(authIdFactory.newFactorId(userId), phoneId, now());
+            persisted(account);
+            assertThat(factorMapper.selectByUserId(userId.value())).hasSize(1);
+
+            LoginAccount loaded = load(userId);
+            loaded.unbindIdentity(phoneId);
+            repository.save(loaded);
+
+            assertThat(factorMapper.selectByUserId(userId.value())).isEmpty();
+            assertThat(identityMapper.selectByUserId(userId.value())).hasSize(1);
             assertThat(repository.findUserIdByIdentity(PHONE)).isEmpty();
             assertThat(repository.findUserIdByIdentity(EMAIL)).contains(userId);
             loadAndAssertLoginAccount(loaded);
@@ -504,7 +557,7 @@ class LoginAccountRepositoryImplIT extends AuthIntegrationTestSupport {
         }
 
         @Test
-        @DisplayName("写入成功后 confirm 失败：update 不抛异常，lookup 停在 RESERVED，等待回收任务")
+        @DisplayName("写入成功后 confirm 失败：update 不抛异常，新标识的 lookup 停在 RESERVED，等待回收任务")
         void confirmFailureAfterCommit() {
             ShardedId userId = persisted(newPhoneIdentityLoginAccount()).getUserId();
             LoginAccount account = load(userId);
@@ -518,7 +571,7 @@ class LoginAccountRepositoryImplIT extends AuthIntegrationTestSupport {
             assertThat(account.hasChanges()).isFalse();
             assertThat(repository.findUserIdByIdentity(EMAIL)).isEmpty();           // RESERVED 查不到
             assertThat(identityMapper.selectByUserId(userId.value())).hasSize(2);   // 数据已提交
-            assertThat(repository.findUserIdByIdentity(PHONE)).isNotEmpty();           // RESERVED 查不到
+            assertThat(repository.findUserIdByIdentity(PHONE)).contains(userId);    // 原有的 PHONE 仍是 ACTIVE
         }
 
         @Test
