@@ -27,7 +27,14 @@ public class PhoneNumberTest {
 
         static Stream<Arguments> validInputs() {
             return Stream.of(
+                    Arguments.of("139-7876-8765","+8613978768765"),
+                    Arguments.of("139 7876 8765","+8613978768765"),
                     Arguments.of("13978768765", "+8613978768765"),
+                    Arguments.of("+86-139-7876-8765","+8613978768765"),
+                    Arguments.of("86 139 7876 8765","+8613978768765"),
+                    Arguments.of("+86 139 7876 8765","+8613978768765"),
+                    Arguments.of("+86139-7876-8765","+8613978768765"),
+                    Arguments.of("+86139 7876 8765","+8613978768765"),
                     Arguments.of("+8613978768765", "+8613978768765")
             );
         }
@@ -36,7 +43,7 @@ public class PhoneNumberTest {
     @DisplayName("parseRawInput() 无效输入")
     class ParseRawInputInvalid{
         @ParameterizedTest
-        @ValueSource(strings = {"12345678901","+8612345678901","1397876876b","+13978768765"})
+        @ValueSource(strings = {"12345678901","+8612345678901","1397876876b","+13978768765","400-800-8888"})
         void shouldThrowException(String phone){
             assertThatThrownBy(()->PhoneNumber.parseRawInput(phone)).isInstanceOf(InvalidArgumentException.class);
         }

@@ -34,7 +34,7 @@ class ShardedAuthIdFactoryTest {
     @DisplayName("根据身份标识解析分片并生成用户 ID")
     void newUserIdByIdentifierShard() {
         ShardId shard = ShardId.of(1);
-        IdentityIdentifier phoneIdentifier = PhoneIdentifier.parseRawInput("13800000000");
+        IdentityIdentifier phoneIdentifier = PhoneIdentifier.from("13800000000");
         ShardedId expected = mock(ShardedId.class);
         when(shardResolver.resolve(phoneIdentifier.type().getCode(), phoneIdentifier.value())).thenReturn(shard);
         when(idGenerator.nextId(any())).thenReturn(expected);
