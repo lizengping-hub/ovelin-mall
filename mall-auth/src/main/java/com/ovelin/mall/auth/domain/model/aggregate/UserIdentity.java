@@ -77,8 +77,8 @@ public class UserIdentity {
         return verifiedAt != null;
     }
 
-    public boolean canReceiveCode() {
-        return identifier.type().canReceiveCode() && isVerified();
+    public boolean canToMfa() {
+        return identifier.type().supportsMfa() && isVerified();
     }
 
     public String value(){

@@ -171,8 +171,8 @@ public class LoginAccount {
         if (factor.getIdentityId() != null) {
             // 引用身份的因子：启用时身份必须仍然存在且已验证
             UserIdentity identity = requireIdentity(factor.getIdentityId());
-            if (!identity.canReceiveCode()) {
-                throw new InvalidStatusException("该身份不能用于二次验证：必须是已验证的手机号或邮箱");
+            if (!identity.isVerified()) { // 目前关联身份的因子在开启时要求type符合并且已验证，
+                throw new InvalidStatusException("该身份不能用于二次验证：不支持二次验证或未完成验证");
             }
         }
         if (factor.enable(at)) {

@@ -45,6 +45,9 @@ public class PhoneNumber {
         if (!PHONE_UTIL.isValidNumber(phoneNumber)) {
             throw new InvalidArgumentException("Invalid phone number: " + rawInput);
         }
+        if (!PHONE_UTIL.getNumberType(phoneNumber).equals(PhoneNumberUtil.PhoneNumberType.MOBILE)){
+            throw new InvalidArgumentException("Must be a mobile phone number: " + rawInput);
+        }
         phoneNumber.setRawInput(rawInput);
         return new PhoneNumber(phoneNumber);
     }
@@ -54,6 +57,12 @@ public class PhoneNumber {
     }
     public String getE164() {
         return PHONE_UTIL.format(phoneNumber, PhoneNumberUtil.PhoneNumberFormat.E164);
+    }
+    public String getRawNumber(){
+        return this.phoneNumber.getRawInput();
+    }
+    public String getNumber(){
+        return PHONE_UTIL.format(phoneNumber, PhoneNumberUtil.PhoneNumberFormat.NATIONAL);
     }
     @Override
     public boolean equals(Object o) {
