@@ -14,7 +14,7 @@ public class UserPasswordPO {
     @TableId(type = IdType.INPUT)
     private Long userId;
 
-    private String passwordHash;
+    private String encodedPassword;
 
     private Instant passwordChangedAt;
 

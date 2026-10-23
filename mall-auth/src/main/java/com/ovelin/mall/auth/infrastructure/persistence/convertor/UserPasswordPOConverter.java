@@ -11,14 +11,14 @@ public final class UserPasswordPOConverter {
 
     public static UserPassword toDomain(UserPasswordPO po) {
         return UserPassword.reconstitute(
-                ShardedId.fromId(po.getUserId()), po.getPasswordHash(), po.getPasswordChangedAt(),
+                ShardedId.fromId(po.getUserId()), po.getEncodedPassword(), po.getPasswordChangedAt(),
                 po.getFailedAttempts(), po.getLockedUntil());
     }
 
     public static UserPasswordPO toPO(UserPassword password) {
         UserPasswordPO po = new UserPasswordPO();
         po.setUserId(password.getUserId().value());
-        po.setPasswordHash(password.getEncodedPassword());
+        po.setEncodedPassword(password.getEncodedPassword());
         po.setPasswordChangedAt(password.getPasswordChangedAt());
         po.setFailedAttempts(password.getFailedAttempts());
         po.setLockedUntil(password.getLockedUntil());

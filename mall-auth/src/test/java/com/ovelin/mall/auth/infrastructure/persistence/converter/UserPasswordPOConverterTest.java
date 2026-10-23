@@ -28,7 +28,7 @@ class UserPasswordPOConverterTest {
     void toDomainConvertsAllFields() {
         UserPasswordPO po = new UserPasswordPO();
         po.setUserId(USER_ID.value());
-        po.setPasswordHash(PASSWORD_HASH);
+        po.setEncodedPassword(PASSWORD_HASH);
         po.setPasswordChangedAt(PASSWORD_CHANGED_AT);
         po.setFailedAttempts(3);
         po.setLockedUntil(LOCKED_UNTIL);
@@ -56,7 +56,7 @@ class UserPasswordPOConverterTest {
         UserPasswordPO po = UserPasswordPOConverter.toPO(password);
 
         assertThat(po.getUserId()).isEqualTo(USER_ID.value());
-        assertThat(po.getPasswordHash()).isEqualTo(PASSWORD_HASH);
+        assertThat(po.getEncodedPassword()).isEqualTo(PASSWORD_HASH);
         assertThat(po.getPasswordChangedAt()).isEqualTo(PASSWORD_CHANGED_AT);
         assertThat(po.getFailedAttempts()).isEqualTo(3);
         assertThat(po.getLockedUntil()).isEqualTo(LOCKED_UNTIL);
@@ -67,7 +67,7 @@ class UserPasswordPOConverterTest {
     void toDomainAllowsNullLockedUntil() {
         UserPasswordPO po = new UserPasswordPO();
         po.setUserId(USER_ID.value());
-        po.setPasswordHash(PASSWORD_HASH);
+        po.setEncodedPassword(PASSWORD_HASH);
         po.setPasswordChangedAt(PASSWORD_CHANGED_AT);
         po.setFailedAttempts(0);
         po.setLockedUntil(null);

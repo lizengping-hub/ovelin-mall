@@ -28,7 +28,7 @@ class UserPasswordMapperIT extends AuthIntegrationTestSupport {
         UserPasswordPO actual = mapper.selectById(userId.value());
 
         assertThat(actual).isNotNull();
-        assertThat(actual.getPasswordHash()).isEqualTo("hash-1");
+        assertThat(actual.getEncodedPassword()).isEqualTo("hash-1");
         assertThat(actual.getPasswordChangedAt()).isEqualTo(po.getPasswordChangedAt());
         assertThat(actual.getLockedUntil()).isNull();
     }
@@ -96,7 +96,7 @@ class UserPasswordMapperIT extends AuthIntegrationTestSupport {
         mapper.insert(po);
 
         UserPasswordPO loaded = mapper.selectById(po.getUserId());
-        po.setPasswordHash("hash-5");
+        po.setEncodedPassword("hash-5");
         mapper.updateById(po);
         UserPasswordPO loaded2 = mapper.selectById(po.getUserId());
 
@@ -106,7 +106,7 @@ class UserPasswordMapperIT extends AuthIntegrationTestSupport {
     private static UserPasswordPO password(ShardedId userId, String hash) {
         UserPasswordPO po = new UserPasswordPO();
         po.setUserId(userId.value());
-        po.setPasswordHash(hash);
+        po.setEncodedPassword(hash);
         return po;
     }
 }
