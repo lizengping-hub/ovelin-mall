@@ -1,11 +1,13 @@
 package com.ovelin.mall.auth.domain.model.aggregate;
 
 import com.ovelin.mall.auth.domain.exception.IdentifierAlreadyBoundException;
+import com.ovelin.mall.auth.domain.exception.IdentifierNotExistException;
 import com.ovelin.mall.auth.domain.exception.IdentityNotExistException;
 import com.ovelin.mall.auth.domain.exception.MfaFactorNotExistException;
 import com.ovelin.mall.auth.domain.model.enums.LoginAccountStatus;
 import com.ovelin.mall.auth.domain.model.enums.MfaFactorType;
 import com.ovelin.mall.auth.domain.model.identityIdentifier.IdentityIdentifier;
+import com.ovelin.mall.auth.domain.model.valueobject.IdentityMfaFactor;
 import com.ovelin.mall.common.exception.global.InvalidArgumentException;
 import com.ovelin.mall.common.exception.global.InvalidStatusException;
 import com.ovelin.mall.common.sharding.core.ov.ShardedId;
@@ -150,6 +152,17 @@ public class LoginAccount {
         addFactorInternal(factor);
         return factor;
     }
+    public UserMfaFactor addIdentityFactor(ShardedId factorId, IdentityMfaFactor factor) {
+        UserIdentity identity = requireIdentity(factor.identifier());   // 按 identifier 找，需要补一个 require 版本
+        boolean exists = factors.stream()
+                .anyMatch(f -> f.references(identity.getId()) && !f.isDisabled());
+        if (exists) {
+            throw new InvalidStatusException("该身份已存在未停用的二次验证因子");
+        }
+        UserMfaFactor created = UserMfaFactor.forIdentity(factorId, identity);
+        addFactorInternal(created);
+        return created;
+    }
 
 
     /** TOTP / WebAuthn / 恢复码：secretEncrypted 由应用服务加密后传入 */
@@ -270,6 +283,10 @@ public class LoginAccount {
     private UserIdentity requireIdentity(ShardedId identityId) {
         return findIdentity(identityId)
                 .orElseThrow(() -> new IdentityNotExistException(identityId));
+    }
+    private UserIdentity requireIdentity(IdentityIdentifier identifier) {
+        return findIdentity(identifier)
+                .orElseThrow(() -> new IdentifierNotExistException(identifier));
     }
 
     private UserMfaFactor requireFactor(ShardedId factorId) {

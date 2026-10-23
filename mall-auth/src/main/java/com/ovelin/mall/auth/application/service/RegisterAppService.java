@@ -11,6 +11,7 @@ import com.ovelin.mall.auth.domain.model.aggregate.UserPassword;
 import com.ovelin.mall.auth.domain.model.enums.IdentityType;
 import com.ovelin.mall.auth.domain.model.identityIdentifier.IdentityIdentifier;
 import com.ovelin.mall.auth.domain.model.identityIdentifier.PhoneIdentifier;
+import com.ovelin.mall.auth.domain.model.valueobject.IdentityMfaFactor;
 import com.ovelin.mall.auth.domain.model.valueobject.Password;
 import com.ovelin.mall.auth.domain.repository.LoginAccountRepository;
 import com.ovelin.mall.auth.domain.repository.UserPasswordRepository;
@@ -42,7 +43,7 @@ public class RegisterAppService {
 
         IdentityIdentifier identifier = IdentifierAssembler.toIdentityIdentifier(identityType, command.identifier());
         Password password = createPasswordIfNeeded(command, identityType);
-
+        IdentityMfaFactor mfa = command.addMfaFactor() ? new IdentityMfaFactor(identifier) : null;  // 验证码之前
         // 外部调用，放在事务外
         verifyCodeIfNeeded(identityType, identifier, command.verifyCode());
 
@@ -51,10 +52,7 @@ public class RegisterAppService {
         ShardedId identityId = authIdFactory.newIdentityId(userId);
         LoginAccount account = LoginAccount.open(userId, identityId, identifier);
 
-
-        if (command.addMfaFactor()) {
-            account.addIdentityFactor(authIdFactory.newFactorId(userId), identityId);
-        }
+        if (mfa != null) account.addIdentityFactor(authIdFactory.newFactorId(userId), mfa);
         UserPassword userPassword = createUserPasswordIfNeeded(userId, password);
 
 
@@ -65,19 +63,10 @@ public class RegisterAppService {
                 persist(account, userPassword, displayName, command.registerSource()));
     }
 
-    private static @Nullable Password createPasswordIfNeeded(RegisterCommand command, IdentityType identityType) {
-        if (identityType.needPassword()){
-            return Password.from(command.password());
-        }
-        return null;
-    }
 
     private void validate(RegisterCommand command, IdentityType identityType) {
         if (command.addMfaFactor() && !identityType.supportsMfa()) {
             throw new InvalidArgumentException(identityType + " 注册不支持开启二次验证");
-        }
-        if (identityType.needPassword() && (command.password() == null || command.password().isBlank())) {
-            throw new InvalidArgumentException("密码不能为空");
         }
     }
     private void persist(LoginAccount account, UserPassword userPassword,
@@ -89,6 +78,12 @@ public class RegisterAppService {
         userApi.createUser(account.getUserId().value(), displayName, registerSource);
     }
 
+    private static @Nullable Password createPasswordIfNeeded(RegisterCommand command, IdentityType identityType) {
+        if (identityType.needPassword()){
+            return Password.from(command.password());
+        }
+        return null;
+    }
 
     private UserPassword createUserPasswordIfNeeded(ShardedId userId, Password password){
         if (password != null){

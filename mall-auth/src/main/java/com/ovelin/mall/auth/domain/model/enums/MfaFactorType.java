@@ -28,4 +28,8 @@ public enum MfaFactorType {
     public boolean referencesIdentity() {
         return this == SMS || this == EMAIL;
     }
+
+    public boolean isSecretBased() {
+        return this == WEBAUTHN || this == RECOVERY_CODE;
+    }
 }
