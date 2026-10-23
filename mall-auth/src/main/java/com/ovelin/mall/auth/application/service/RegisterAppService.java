@@ -40,14 +40,13 @@ public class RegisterAppService {
         IdentityIdentifier identifier = IdentifierAssembler.toIdentityIdentifier(identityType, command.identifier());
 
         // 外部调用，放在事务外
-        Instant codeVerifiedAt = verifyCodeIfNeeded(identityType, identifier, command.verifyCode());
+        verifyCodeIfNeeded(identityType, identifier, command.verifyCode());
 
         ShardedId userId = authIdFactory.newUserId(identifier);
         ShardedId identityId = authIdFactory.newIdentityId(userId);
         LoginAccount account = LoginAccount.open(userId, identityId, identifier);
 
         UserPassword userPassword = createUserPasswordIfNeeded(userId, identityType, command.password());
-        verifyIdentity(account, identityId, userPassword, codeVerifiedAt);
 
         if (command.addMfaFactor()) {
             account.addIdentityFactor(authIdFactory.newFactorId(userId), identityId);
@@ -81,27 +80,15 @@ public class RegisterAppService {
         }
         return null;
     }
-    private Instant verifyCodeIfNeeded(IdentityType type, IdentityIdentifier identifier, String code) {
+    private void verifyCodeIfNeeded(IdentityType type, IdentityIdentifier identifier, String code) {
         if (!type.needVerifyCode()) {
-            return null;
+            return;
         }
         if (code == null || code.isBlank() || !verificationCodeVerifier.verify(identifier, code)) {
             throw new VerificationFailedException();
         }
-        return Instant.now();
     }
 
-    private void verifyIdentity(LoginAccount account, ShardedId identityId,
-                                UserPassword userPassword, Instant codeVerifiedAt) {
-        // 验证码是更直接的所有权证明，优先；其次是密码设置时间（用户名场景）
-        Instant verifyAt = codeVerifiedAt;
-        if (verifyAt == null && userPassword != null) {
-            verifyAt = userPassword.getPasswordChangedAt();
-        }
-        if (verifyAt != null) {
-            account.verifyIdentity(identityId, verifyAt);
-        }
-    }
 
     private String resolveDisplayName(IdentityIdentifier identifier, ShardedId userId){
         return switch (identifier.type()){
