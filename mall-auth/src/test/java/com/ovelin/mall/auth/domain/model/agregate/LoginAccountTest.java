@@ -23,7 +23,6 @@ import java.time.Instant;
 import static com.ovelin.mall.common.sharding.core.ov.ShardedId.of;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
-
 class LoginAccountTest {
 
     private static final Instant NOW = Instant.parse("2026-10-14T00:00:00Z");
@@ -58,6 +57,7 @@ class LoginAccountTest {
         @Test
         void createsAccountWithFirstIdentityAsAddedChange() {
             LoginAccount account = LoginAccount.open(USER, USERNAME_ID, USERNAME_IDENTITY_IDENTIFIER);
+
             assertThat(account.isNew()).isTrue();
             assertThat(account.getVersion()).isZero();
             assertThat(account.getUserId()).isEqualTo(USER);
@@ -67,11 +67,10 @@ class LoginAccountTest {
             assertThat(account.hasChanges()).isTrue();
 
             account.makeSaved();
+
             assertThat(account.isNew()).isFalse();
             assertThat(account.hasChanges()).isFalse();
             assertThat(account.getVersion()).isZero();
-
-
         }
 
         @Test
@@ -88,12 +87,13 @@ class LoginAccountTest {
         void addsIdentityAndRecordsAddedChange() {
             LoginAccount account = persisted();
 
-            account.bindIdentity(PHONE_ID,PHONE_IDENTITY_IDENTIFIER);
+            account.bindIdentity(PHONE_ID, PHONE_IDENTITY_IDENTIFIER);
 
             assertThat(account.getIdentities()).hasSize(2);
             assertThat(account.addedIdentities()).extracting(UserIdentity::getId).containsExactly(PHONE_ID);
 
             account.makeSaved();
+
             assertThat(account.isNew()).isFalse();
             assertThat(account.hasChanges()).isFalse();
             assertThat(account.getVersion()).isEqualTo(1);
@@ -105,6 +105,7 @@ class LoginAccountTest {
 
             assertThatThrownBy(() -> account.bindIdentity(EMAIL_ID, PHONE_IDENTITY_IDENTIFIER))
                     .isInstanceOf(IdentifierAlreadyBoundException.class);
+            assertThat(account.getIdentities()).hasSize(2);
         }
 
         @Test
@@ -113,6 +114,7 @@ class LoginAccountTest {
 
             assertThatThrownBy(() -> account.bindIdentity(OTHER_SHARD, PHONE_IDENTITY_IDENTIFIER))
                     .isInstanceOf(InvalidArgumentException.class);
+            assertThat(account.getIdentities()).hasSize(1);
         }
     }
 
@@ -150,11 +152,11 @@ class LoginAccountTest {
             assertThat(account.getIdentities()).hasSize(1);
         }
 
+        /** 因子引用的身份不可能先于因子消失：解绑时必须连带移除引用它的因子，这是 enableFactor 不再检查身份的前提 */
         @Test
-        void disablesReferencingFactorsBeforeRemovingIdentity() {
+        void removesReferencingFactorsWhenUnbindingIdentity() {
             LoginAccount account = persistedWithPhone();
-            account.addIdentityFactor(FACTOR_1, PHONE_ID,Instant.now());
-            account.enableFactor(FACTOR_1, NOW);
+            account.addIdentityFactor(FACTOR_1, PHONE_ID, NOW);
             account.addSecretFactor(FACTOR_2, MfaFactorType.TOTP, "secret");
             account.enableFactor(FACTOR_2, NOW);
             account.makeSaved();
@@ -163,6 +165,7 @@ class LoginAccountTest {
 
             assertThat(account.removedIdentities()).extracting(UserIdentity::getId).containsExactly(PHONE_ID);
             assertThat(account.removedFactors()).extracting(UserMfaFactor::getId).containsExactly(FACTOR_1);
+            assertThat(account.getFactors()).extracting(UserMfaFactor::getId).containsExactly(FACTOR_2);
             // 不引用该身份的因子保持启用
             assertThat(account.enabledFactors()).extracting(UserMfaFactor::getId).containsExactly(FACTOR_2);
         }
@@ -191,15 +194,26 @@ class LoginAccountTest {
     class IdentityFactors {
 
         @Test
-        void phoneAndEmailCanBeUsedWithoutIdentityVerification() {
-            LoginAccount account = persisted();
-            account.bindIdentity(PHONE_ID, PHONE_IDENTITY_IDENTIFIER);
+        void phoneIdentityFactorIsCreatedEnabled() {
+            LoginAccount account = persistedWithPhone();
 
-            UserMfaFactor factor = account.addIdentityFactor(FACTOR_1, PHONE_ID, Instant.now());
+            UserMfaFactor factor = account.addIdentityFactor(FACTOR_1, PHONE_ID, NOW);
 
             assertThat(factor.getType()).isEqualTo(MfaFactorType.SMS);
             assertThat(factor.getIdentityId()).isEqualTo(PHONE_ID);
+            assertThat(factor.getSecretEncrypted()).isNull();
             assertThat(factor.getStatus()).isEqualTo(MfaFactorStatus.ENABLED);
+            assertThat(factor.getVerifiedAt()).isEqualTo(NOW);
+            assertThat(account.requiresMfa()).isTrue();
+        }
+
+        /** 创建即启用：变更集里只有一条新增，不会再多出一条"修改" */
+        @Test
+        void createdFactorIsRecordedAsSingleAddedChange() {
+            LoginAccount account = persistedWithPhone();
+
+            account.addIdentityFactor(FACTOR_1, PHONE_ID, NOW);
+
             assertThat(account.addedFactors()).extracting(UserMfaFactor::getId).containsExactly(FACTOR_1);
             assertThat(account.dirtyFactors()).isEmpty();
         }
@@ -208,28 +222,55 @@ class LoginAccountTest {
         void usernameIdentityCannotBeUsedForIdentityFactor() {
             LoginAccount account = persisted();
 
-            assertThatThrownBy(() -> account.addIdentityFactor(FACTOR_1, USERNAME_ID,Instant.now()))
+            assertThatThrownBy(() -> account.addIdentityFactor(FACTOR_1, USERNAME_ID, NOW))
                     .isInstanceOf(InvalidArgumentException.class);
+            assertThat(account.getFactors()).isEmpty();
+            assertThat(account.hasChanges()).isFalse();
+        }
+
+        @Test
+        void rejectsUnknownIdentity() {
+            LoginAccount account = persisted();
+
+            assertThatThrownBy(() -> account.addIdentityFactor(FACTOR_1, EMAIL_ID, NOW))
+                    .isInstanceOf(IdentityNotExistException.class);
+            assertThat(account.getFactors()).isEmpty();
         }
 
         @Test
         void rejectsSecondActiveFactorOnSameIdentityButAllowsAfterDisable() {
             LoginAccount account = persistedWithPhone();
-            account.addIdentityFactor(FACTOR_1, PHONE_ID,Instant.now());
+            account.addIdentityFactor(FACTOR_1, PHONE_ID, NOW);
 
-            assertThatThrownBy(() -> account.addIdentityFactor(FACTOR_2, PHONE_ID,Instant.now()))
+            assertThatThrownBy(() -> account.addIdentityFactor(FACTOR_2, PHONE_ID, NOW))
                     .isInstanceOf(InvalidStatusException.class);
 
             account.disableFactor(FACTOR_1);
-            assertThat(account.addIdentityFactor(FACTOR_2, PHONE_ID,Instant.now()).getId()).isEqualTo(FACTOR_2);
+            assertThat(account.addIdentityFactor(FACTOR_2, PHONE_ID, NOW).getId()).isEqualTo(FACTOR_2);
         }
 
         @Test
-        void cannotBeEnabledAfterItsIdentityWasUnbound() {
+        void disabledIdentityFactorCanBeEnabledAgain() {
             LoginAccount account = persistedWithPhone();
-            account.addIdentityFactor(FACTOR_1, PHONE_ID,Instant.now());
+            account.addIdentityFactor(FACTOR_1, PHONE_ID, NOW);
+            account.disableFactor(FACTOR_1);
+            account.makeSaved();
+
+            account.enableFactor(FACTOR_1, NOW.plusSeconds(60));
+
+            assertThat(account.dirtyFactors()).extracting(UserMfaFactor::getId).containsExactly(FACTOR_1);
+            assertThat(account.dirtyFactors().getFirst().getStatus()).isEqualTo(MfaFactorStatus.ENABLED);
+            assertThat(account.requiresMfa()).isTrue();
+        }
+
+        @Test
+        void factorIsGoneAfterItsIdentityWasUnbound() {
+            LoginAccount account = persistedWithPhone();
+            account.addIdentityFactor(FACTOR_1, PHONE_ID, NOW);
+
             account.unbindIdentity(PHONE_ID);
 
+            assertThat(account.getFactors()).isEmpty();
             assertThatThrownBy(() -> account.enableFactor(FACTOR_1, NOW))
                     .isInstanceOf(MfaFactorNotExistException.class);
         }
@@ -247,6 +288,7 @@ class LoginAccountTest {
             assertThat(factor.getSecretEncrypted()).isEqualTo("encrypted");
             assertThat(factor.getIdentityId()).isNull();
             assertThat(factor.getStatus()).isEqualTo(MfaFactorStatus.PENDING);
+            assertThat(account.requiresMfa()).isFalse();
         }
 
         @Test
@@ -281,6 +323,17 @@ class LoginAccountTest {
             assertThat(factor.getStatus()).isEqualTo(MfaFactorStatus.ENABLED);
             assertThat(factor.getVerifiedAt()).isEqualTo(NOW);
             assertThat(account.requiresMfa()).isTrue();
+        }
+
+        @Test
+        void enablingAlreadyEnabledFactorIsNotAChange() {
+            LoginAccount account = persistedWithPhone();
+            account.addIdentityFactor(FACTOR_1, PHONE_ID, NOW);
+            account.makeSaved();
+
+            account.enableFactor(FACTOR_1, NOW.plusSeconds(60));
+
+            assertThat(account.hasChanges()).isFalse();
         }
 
         @Test
@@ -348,7 +401,7 @@ class LoginAccountTest {
         @Test
         void removesAllFactorsAndIdentities() {
             LoginAccount account = persistedWithPhone();
-            account.addIdentityFactor(FACTOR_1, PHONE_ID, Instant.now());
+            account.addIdentityFactor(FACTOR_1, PHONE_ID, NOW);
             account.addSecretFactor(FACTOR_2, MfaFactorType.TOTP, "s");
             account.makeSaved();
 
@@ -381,7 +434,7 @@ class LoginAccountTest {
         }
 
         @Test
-        void makeSaveEmptiesAllChangeSets() {
+        void makeSavedEmptiesAllChangeSets() {
             LoginAccount account = persisted();
             account.bindIdentity(PHONE_ID, PHONE_IDENTITY_IDENTIFIER);
             account.recordLogin(USERNAME_ID, NOW);
