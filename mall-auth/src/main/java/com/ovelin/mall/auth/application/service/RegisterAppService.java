@@ -34,7 +34,6 @@ public class RegisterAppService {
     private final UserApi userApi;
     private final VerificationCodeVerifier verificationCodeVerifier;
     private final TransactionTemplate transactionTemplate;
-    private final Clock clock;
 
     public void register(RegisterCommand command) {
         IdentityType identityType = IdentityType.fromCode(command.type());
@@ -55,7 +54,7 @@ public class RegisterAppService {
         LoginAccount account = LoginAccount.open(userId, identityId, identifier);
 
         if (command.addMfaFactor()) {
-            account.addIdentityFactor(authIdFactory.newFactorId(userId), identityId, clock.instant());
+            account.addIdentityFactor(authIdFactory.newFactorId(userId), identityId, Instant.now());
         }
         UserPassword userPassword = createUserPasswordIfNeeded(userId, password);
 
