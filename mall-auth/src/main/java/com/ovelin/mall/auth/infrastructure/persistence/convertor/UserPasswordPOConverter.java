@@ -18,7 +18,7 @@ public final class UserPasswordPOConverter {
     public static UserPasswordPO toPO(UserPassword password) {
         UserPasswordPO po = new UserPasswordPO();
         po.setUserId(password.getUserId().value());
-        po.setPasswordHash(password.getPasswordHash());
+        po.setPasswordHash(password.getEncodedPassword());
         po.setPasswordChangedAt(password.getPasswordChangedAt());
         po.setFailedAttempts(password.getFailedAttempts());
         po.setLockedUntil(password.getLockedUntil());

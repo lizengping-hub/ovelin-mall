@@ -8,6 +8,10 @@ import com.ovelin.mall.common.exception.global.InvalidArgumentException;
 import java.util.Set;
 import java.util.regex.Pattern;
 
+/**
+ * 非常宽松的格式，基本只要是真实的手机号，任何格式都可以读入</br>
+ * 必须要是手机号
+ */
 public class PhoneNumber {
 
     private static final PhoneNumberUtil PHONE_UTIL = PhoneNumberUtil.getInstance();

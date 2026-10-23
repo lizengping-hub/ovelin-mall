@@ -36,7 +36,7 @@ class UserPasswordPOConverterTest {
         UserPassword password = UserPasswordPOConverter.toDomain(po);
 
         assertThat(password.getUserId()).isEqualTo(USER_ID);
-        assertThat(password.getPasswordHash()).isEqualTo(PASSWORD_HASH);
+        assertThat(password.getEncodedPassword()).isEqualTo(PASSWORD_HASH);
         assertThat(password.getPasswordChangedAt()).isEqualTo(PASSWORD_CHANGED_AT);
         assertThat(password.getFailedAttempts()).isEqualTo(3);
         assertThat(password.getLockedUntil()).isEqualTo(LOCKED_UNTIL);

@@ -23,10 +23,10 @@ public class CredentialAppService {
         UserPassword password = passwordRepository.findByUserId(userId)
                 .orElseThrow(()->new AccountNotFoundException(userId));
 
-        if (!passwordEncoder.matches(oldPassword, password.getPasswordHash())) {
-            throw new PasswordFailedException();
-        }
-        password.change(passwordEncoder.encode(newPassword), clock.instant());
+//        if (!passwordEncoder.matches(oldPassword, password.getEncodedPassword())) {
+//            throw new PasswordFailedException();
+//        }
+//        password.change(passwordEncoder.encode(newPassword), clock.instant());
         passwordRepository.update(password);
     }
 }

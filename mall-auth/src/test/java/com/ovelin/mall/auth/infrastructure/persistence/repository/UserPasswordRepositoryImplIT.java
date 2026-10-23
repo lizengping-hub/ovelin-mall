@@ -1,8 +1,8 @@
 package com.ovelin.mall.auth.infrastructure.persistence.repository;
 
 import com.ovelin.mall.auth.domain.model.aggregate.UserPassword;
+import com.ovelin.mall.auth.domain.model.valueobject.EncodedPassword;
 import com.ovelin.mall.auth.infrastructure.persistence.AuthIntegrationTestSupport;
-import com.ovelin.mall.common.sharding.core.ov.ShardedId;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
@@ -78,11 +78,11 @@ class UserPasswordRepositoryImplIT extends AuthIntegrationTestSupport {
             UserPassword password = savedPassword("old-hash");
             Instant changedAt = now().plusSeconds(60);
 
-            password.change("new-hash", changedAt);
+            password.change(new EncodedPassword("new-hash"), changedAt);
             repository.update(password);
 
             UserPassword actual = reload(password);
-            assertThat(actual.getPasswordHash()).isEqualTo("new-hash");
+            assertThat(actual.getEncodedPassword()).isEqualTo("new-hash");
             assertThat(actual.getPasswordChangedAt()).isEqualTo(changedAt);
         }
     }
@@ -105,8 +105,8 @@ class UserPasswordRepositoryImplIT extends AuthIntegrationTestSupport {
     }
 
     /** 新建并落库一条密码记录，每次使用独立的 userId。 */
-    private UserPassword savedPassword(String hash) {
-        UserPassword password = UserPassword.create(newId("user", 0), hash, now());
+    private UserPassword savedPassword(String encodedPassword) {
+        UserPassword password = UserPassword.create(newId("user", 0), new EncodedPassword(encodedPassword), now());
         repository.add(password);
         return password;
     }
