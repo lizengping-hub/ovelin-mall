@@ -11,11 +11,9 @@ import com.ovelin.mall.auth.domain.model.aggregate.UserPassword;
 import com.ovelin.mall.auth.domain.model.enums.IdentityType;
 import com.ovelin.mall.auth.domain.model.identityIdentifier.IdentityIdentifier;
 import com.ovelin.mall.auth.domain.model.identityIdentifier.PhoneIdentifier;
-import com.ovelin.mall.auth.domain.model.valueobject.IdentityMfaFactor;
 import com.ovelin.mall.auth.domain.model.valueobject.Password;
 import com.ovelin.mall.auth.domain.repository.LoginAccountRepository;
 import com.ovelin.mall.auth.domain.repository.UserPasswordRepository;
-import com.ovelin.mall.common.exception.global.InvalidArgumentException;
 import com.ovelin.mall.common.sharding.core.ov.ShardedId;
 import com.ovelin.mall.user.api.UserApi;
 import lombok.RequiredArgsConstructor;
@@ -23,6 +21,7 @@ import org.jspecify.annotations.Nullable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.support.TransactionTemplate;
 
+import java.time.Clock;
 import java.time.Instant;
 
 @Service
@@ -39,11 +38,13 @@ public class RegisterAppService {
     public void register(RegisterCommand command) {
         IdentityType identityType = IdentityType.fromCode(command.type());
 
-        validate(command, identityType);   // fail-fast：不消耗验证码、不消耗 id
-
+        if (command.addMfaFactor()){
+            // fail-fast：不消耗验证码、不消耗 id，规则以 forIdentity 为准，这里仅为提前失败，最终实现都在 identityType.requireSupportsMfa();
+            identityType.requireSupportsMfa();
+        }
         IdentityIdentifier identifier = IdentifierAssembler.toIdentityIdentifier(identityType, command.identifier());
         Password password = createPasswordIfNeeded(command, identityType);
-        IdentityMfaFactor mfa = command.addMfaFactor() ? new IdentityMfaFactor(identifier) : null;  // 验证码之前
+
         // 外部调用，放在事务外
         verifyCodeIfNeeded(identityType, identifier, command.verifyCode());
 
@@ -52,7 +53,9 @@ public class RegisterAppService {
         ShardedId identityId = authIdFactory.newIdentityId(userId);
         LoginAccount account = LoginAccount.open(userId, identityId, identifier);
 
-        if (mfa != null) account.addIdentityFactor(authIdFactory.newFactorId(userId), mfa);
+        if (command.addMfaFactor()) {
+            account.addIdentityFactor(authIdFactory.newFactorId(userId), identityId);
+        }
         UserPassword userPassword = createUserPasswordIfNeeded(userId, password);
 
 
@@ -64,11 +67,6 @@ public class RegisterAppService {
     }
 
 
-    private void validate(RegisterCommand command, IdentityType identityType) {
-        if (command.addMfaFactor() && !identityType.supportsMfa()) {
-            throw new InvalidArgumentException(identityType + " 注册不支持开启二次验证");
-        }
-    }
     private void persist(LoginAccount account, UserPassword userPassword,
                          String displayName, String registerSource) {
         loginAccountRepository.save(account);

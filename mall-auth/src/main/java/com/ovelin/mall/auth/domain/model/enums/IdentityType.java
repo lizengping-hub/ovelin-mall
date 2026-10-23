@@ -38,8 +38,10 @@ public enum IdentityType {
         return this == PHONE || this == EMAIL;
     }
 
-    /** 能否在注册时绑定二次验证因子（需要有可用通道） */
-    public boolean supportsMfa() {
-        return this == PHONE || this == EMAIL;
+    public void requireSupportsMfa() {
+        if (this == PHONE || this == EMAIL){
+            return;
+        }
+        throw new InvalidArgumentException(this + "不支持开启二次校验");
     }
 }

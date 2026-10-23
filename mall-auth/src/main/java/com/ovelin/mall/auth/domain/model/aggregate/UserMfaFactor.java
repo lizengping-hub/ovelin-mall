@@ -40,9 +40,7 @@ public class UserMfaFactor {
 
     /** 短信/邮箱因子：引用一个支持二次验证的身份，不存密钥。仅由 LoginAccount 调用 */
     static UserMfaFactor forIdentity(ShardedId id, UserIdentity identity) {
-        if (!identity.type().supportsMfa()){
-            throw new InvalidArgumentException("该身份不能用于二次验证或");
-        }
+        identity.type().requireSupportsMfa();
         requireSameShard(id, identity.getUserId());
         MfaFactorType type = identity.type() == IdentityType.PHONE ? MfaFactorType.SMS : MfaFactorType.EMAIL;
         return new UserMfaFactor(id, identity.getUserId(), type, identity.getId(), null,
