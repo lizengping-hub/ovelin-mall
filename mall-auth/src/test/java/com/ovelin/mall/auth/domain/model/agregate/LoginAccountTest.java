@@ -88,7 +88,7 @@ class LoginAccountTest {
         void addsIdentityAndRecordsAddedChange() {
             LoginAccount account = persisted();
 
-            UserIdentity phone = account.bindIdentity(PHONE_ID,PHONE_IDENTITY_IDENTIFIER);
+            account.bindIdentity(PHONE_ID,PHONE_IDENTITY_IDENTIFIER);
 
             assertThat(account.getIdentities()).hasSize(2);
             assertThat(account.addedIdentities()).extracting(UserIdentity::getId).containsExactly(PHONE_ID);
@@ -153,7 +153,7 @@ class LoginAccountTest {
         @Test
         void disablesReferencingFactorsBeforeRemovingIdentity() {
             LoginAccount account = persistedWithPhone();
-            account.addIdentityFactor(FACTOR_1, PHONE_ID);
+            account.addIdentityFactor(FACTOR_1, PHONE_ID,Instant.now());
             account.enableFactor(FACTOR_1, NOW);
             account.addSecretFactor(FACTOR_2, MfaFactorType.TOTP, "secret");
             account.enableFactor(FACTOR_2, NOW);
@@ -195,38 +195,39 @@ class LoginAccountTest {
             LoginAccount account = persisted();
             account.bindIdentity(PHONE_ID, PHONE_IDENTITY_IDENTIFIER);
 
-            UserMfaFactor factor = account.addIdentityFactor(FACTOR_1, PHONE_ID);
+            UserMfaFactor factor = account.addIdentityFactor(FACTOR_1, PHONE_ID, Instant.now());
 
             assertThat(factor.getType()).isEqualTo(MfaFactorType.SMS);
             assertThat(factor.getIdentityId()).isEqualTo(PHONE_ID);
-            assertThat(factor.getStatus()).isEqualTo(MfaFactorStatus.PENDING);
+            assertThat(factor.getStatus()).isEqualTo(MfaFactorStatus.ENABLED);
             assertThat(account.addedFactors()).extracting(UserMfaFactor::getId).containsExactly(FACTOR_1);
+            assertThat(account.dirtyFactors()).isEmpty();
         }
 
         @Test
         void usernameIdentityCannotBeUsedForIdentityFactor() {
             LoginAccount account = persisted();
 
-            assertThatThrownBy(() -> account.addIdentityFactor(FACTOR_1, USERNAME_ID))
+            assertThatThrownBy(() -> account.addIdentityFactor(FACTOR_1, USERNAME_ID,Instant.now()))
                     .isInstanceOf(InvalidArgumentException.class);
         }
 
         @Test
         void rejectsSecondActiveFactorOnSameIdentityButAllowsAfterDisable() {
             LoginAccount account = persistedWithPhone();
-            account.addIdentityFactor(FACTOR_1, PHONE_ID);
+            account.addIdentityFactor(FACTOR_1, PHONE_ID,Instant.now());
 
-            assertThatThrownBy(() -> account.addIdentityFactor(FACTOR_2, PHONE_ID))
+            assertThatThrownBy(() -> account.addIdentityFactor(FACTOR_2, PHONE_ID,Instant.now()))
                     .isInstanceOf(InvalidStatusException.class);
 
             account.disableFactor(FACTOR_1);
-            assertThat(account.addIdentityFactor(FACTOR_2, PHONE_ID).getId()).isEqualTo(FACTOR_2);
+            assertThat(account.addIdentityFactor(FACTOR_2, PHONE_ID,Instant.now()).getId()).isEqualTo(FACTOR_2);
         }
 
         @Test
         void cannotBeEnabledAfterItsIdentityWasUnbound() {
             LoginAccount account = persistedWithPhone();
-            account.addIdentityFactor(FACTOR_1, PHONE_ID);
+            account.addIdentityFactor(FACTOR_1, PHONE_ID,Instant.now());
             account.unbindIdentity(PHONE_ID);
 
             assertThatThrownBy(() -> account.enableFactor(FACTOR_1, NOW))
@@ -276,7 +277,7 @@ class LoginAccountTest {
 
             account.enableFactor(FACTOR_1, NOW);
 
-            UserMfaFactor factor = account.dirtyFactors().get(0);
+            UserMfaFactor factor = account.dirtyFactors().getFirst();
             assertThat(factor.getStatus()).isEqualTo(MfaFactorStatus.ENABLED);
             assertThat(factor.getVerifiedAt()).isEqualTo(NOW);
             assertThat(account.requiresMfa()).isTrue();
@@ -317,7 +318,7 @@ class LoginAccountTest {
             account.recordFactorUsed(FACTOR_1, NOW);
 
             assertThat(account.dirtyFactors()).extracting(UserMfaFactor::getId).containsExactly(FACTOR_1);
-            assertThat(account.dirtyFactors().get(0).getLastUsedAt()).isEqualTo(NOW);
+            assertThat(account.dirtyFactors().getFirst().getLastUsedAt()).isEqualTo(NOW);
         }
 
         @Test
@@ -347,7 +348,7 @@ class LoginAccountTest {
         @Test
         void removesAllFactorsAndIdentities() {
             LoginAccount account = persistedWithPhone();
-            account.addIdentityFactor(FACTOR_1, PHONE_ID);
+            account.addIdentityFactor(FACTOR_1, PHONE_ID, Instant.now());
             account.addSecretFactor(FACTOR_2, MfaFactorType.TOTP, "s");
             account.makeSaved();
 

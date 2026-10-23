@@ -138,14 +138,14 @@ public class LoginAccount {
     // ------------------------------------------------------------------ 二次验证因子
 
     /** 短信/邮箱因子：引用本账号内一个手机号/邮箱身份 */
-    public UserMfaFactor addIdentityFactor(ShardedId factorId, ShardedId identityId) {
+    public UserMfaFactor addIdentityFactor(ShardedId factorId, ShardedId identityId, Instant enabledAt) {
         UserIdentity identity = requireIdentity(identityId);
         boolean exists = factors.stream()
                 .anyMatch(f -> f.references(identityId) && !f.isDisabled());
         if (exists) {
             throw new InvalidStatusException("该身份已存在未停用的二次验证因子");
         }
-        UserMfaFactor factor = UserMfaFactor.forIdentity(factorId, identity);
+        UserMfaFactor factor = UserMfaFactor.forIdentity(factorId, identity, enabledAt);
         addFactorInternal(factor);
         return factor;
     }

@@ -320,7 +320,7 @@ class LoginAccountRepositoryImplIT extends AuthIntegrationTestSupport {
             LoginAccount loaded = load(userId);
             ShardedId emailId = authIdFactory.newIdentityId(userId);
             loaded.bindIdentity(emailId, EMAIL);
-            UserMfaFactor factor = loaded.addIdentityFactor(authIdFactory.newFactorId(userId), emailId);
+            UserMfaFactor factor = loaded.addIdentityFactor(authIdFactory.newFactorId(userId), emailId, now());
             loaded.enableFactor(factor.getId(), now());
             loaded.addSecretFactor(authIdFactory.newFactorId(userId), MfaFactorType.TOTP, "encrypted-secret");
             repository.save(loaded);
@@ -658,7 +658,7 @@ class LoginAccountRepositoryImplIT extends AuthIntegrationTestSupport {
         LoginAccount account = LoginAccount.open(userId, identityId, PHONE);
         if (addFactor){
             ShardedId factorId = authIdFactory.newFactorId(userId);
-            account.addIdentityFactor(factorId, identityId);
+            account.addIdentityFactor(factorId, identityId, now());
         }
         return account;
     }

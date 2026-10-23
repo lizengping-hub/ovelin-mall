@@ -39,12 +39,14 @@ public class UserMfaFactor {
     }
 
     /** 短信/邮箱因子：引用一个支持二次验证的身份，不存密钥。仅由 LoginAccount 调用 */
-    static UserMfaFactor forIdentity(ShardedId id, UserIdentity identity) {
+    static UserMfaFactor forIdentity(ShardedId id, UserIdentity identity, Instant enabledAt) {
         identity.type().requireSupportsMfa();
         requireSameShard(id, identity.getUserId());
         MfaFactorType type = identity.type() == IdentityType.PHONE ? MfaFactorType.SMS : MfaFactorType.EMAIL;
-        return new UserMfaFactor(id, identity.getUserId(), type, identity.getId(), null,
+        UserMfaFactor factor = new UserMfaFactor(id, identity.getUserId(), type, identity.getId(), null,
                 MfaFactorStatus.PENDING, null, null);
+        factor.enable(enabledAt);
+        return factor;
     }
 
     /** TOTP / WebAuthn / 恢复码：secretEncrypted 由应用服务加密后传入。仅由 LoginAccount 调用 */
